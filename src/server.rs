@@ -41,7 +41,6 @@ impl<G: Generator> Server<G> {
         let cam_chunk_pos = (frustum.cam_pos / 32.0).as_ivec3();
 
         let now = Instant::now();
-
         let chunks: Vec<ChunkID> = if use_new_code {
             frustum.flood_fill()
         } else {

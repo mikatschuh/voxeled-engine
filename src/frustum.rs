@@ -26,6 +26,7 @@ pub fn cube(edges: i32, lod_level: LodLevel) -> IntoIter<ChunkID> {
 }
 
 /// Chunks are 32^3
+#[derive(Debug, Clone, Copy)]
 pub struct Frustum {
     pub cam_pos: Vec3,
     pub direction: Vec3,
@@ -99,7 +100,6 @@ impl Frustum {
         candidates.push_back(base_chunk);
         already_queued.insert(base_chunk);
 
-        let mut current_lod = 0;
         let mut next_lods_candidates: VecDeque<ChunkID> =
             VecDeque::with_capacity(self.max_chunks * 2);
 
@@ -118,9 +118,9 @@ impl Frustum {
                             (neighbor.total_pos() & !1).as_vec3(),
                         );
                         let parent = neighbor.parent();
-                        if lod > current_lod && already_queued.insert(parent) {
+                        if lod > chunk.lod && already_queued.insert(parent) {
                             next_lods_candidates.push_back(parent);
-                        } else if lod == current_lod {
+                        } else if lod == chunk.lod {
                             candidates.push_back(neighbor);
                         }
                     }
@@ -129,7 +129,6 @@ impl Frustum {
 
             if candidates.is_empty() {
                 std::mem::swap(&mut candidates, &mut next_lods_candidates);
-                current_lod += 1;
             }
         }
 
