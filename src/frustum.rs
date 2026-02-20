@@ -132,7 +132,6 @@ impl Frustum {
                 current_lod += 1;
             }
         }
-        println!("number of chunks: {}", chunks.len());
 
         chunks
     }
