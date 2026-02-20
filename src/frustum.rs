@@ -3,7 +3,6 @@ use glam::{IVec3, Vec3};
 use std::{
     cmp::Reverse,
     collections::{HashSet, VecDeque},
-    time::Instant,
     vec::IntoIter,
 };
 

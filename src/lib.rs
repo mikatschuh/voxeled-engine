@@ -3,18 +3,17 @@ use glam::{IVec3, Vec3};
 pub mod physics;
 
 mod chunk;
-pub mod frustum;
 #[allow(dead_code)]
-pub mod world_gen;
 // mod sampling;
-
 #[allow(dead_code)]
 mod data_structures;
+pub mod frustum;
 mod job;
 mod mesh;
 mod meshing;
 mod random;
 mod server;
+mod world_gen;
 
 #[cfg(test)]
 mod test;
@@ -38,3 +37,6 @@ pub use server::Server;
 pub use threadpool::Threadpool;
 pub use time::{DeltaTime, DeltaTimeMeter};
 pub use voxel::VoxelType;
+pub use world_gen::{
+    Box, ComposeableGenerator, Gen2D, Gen3D, Layer, Seed, ShapeGenerator, generators,
+};
