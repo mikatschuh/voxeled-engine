@@ -11,7 +11,7 @@ fn benchmark_flood_fill(c: &mut Criterion) {
             direction: Vec3::new(0.3, 0.7, 0.6).normalize(),
             fov: FRAC_PI_3,
             aspect_ratio: 16. / 9.,
-            max_chunks: 1_000_000,
+            max_chunks: 5000,
             max_distance: 48.,
             full_detail_range: 12.,
         };

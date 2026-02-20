@@ -42,8 +42,6 @@ pub struct Frustum {
 
 impl Frustum {
     pub fn flood_fill(self) -> Vec<ChunkID> {
-        let now = Instant::now();
-
         if self.max_chunks == 0 {
             return Vec::new();
         }
@@ -134,8 +132,6 @@ impl Frustum {
                 std::mem::swap(&mut candidates, &mut next_lods_candidates);
             }
         }
-        println!("flood_fill: {}", now.elapsed().as_micros());
-        println!("number of chunks: {}", chunks.len());
 
         chunks
     }
