@@ -3,6 +3,7 @@ use glam::{IVec3, Vec3};
 use std::{
     cmp::Reverse,
     collections::{HashSet, VecDeque},
+    time::Instant,
     vec::IntoIter,
 };
 
@@ -41,6 +42,8 @@ pub struct Frustum {
 
 impl Frustum {
     pub fn flood_fill(self) -> Vec<ChunkID> {
+        let now = Instant::now();
+
         if self.max_chunks == 0 {
             return Vec::new();
         }
@@ -131,6 +134,7 @@ impl Frustum {
                 std::mem::swap(&mut candidates, &mut next_lods_candidates);
             }
         }
+        println!("flood_fill: {}", now.elapsed().as_micros());
 
         chunks
     }
