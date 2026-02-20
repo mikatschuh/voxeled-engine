@@ -6,3 +6,12 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 glam = "0.23"
+parking_lot = "*"
+tokio = "*"
+crossbeam = "0.8.4"
+num_cpus = "1.16"
+rand = "0.8.5"
+noise = "*"
+bytemuck = { version = "1.16", features = ["derive"] }
+wgpu = "25.0"
+colored = "2.0"

@@ -1,6 +1,6 @@
 use glam::{IVec3, Vec3};
 
-use crate::physics::block;
+use crate::block;
 
 pub trait Voxel {
     fn solid_at(&self, pos: IVec3) -> bool;
@@ -68,15 +68,11 @@ impl Aabb {
         (block(self.min), block(self.max))
     }
 
-    fn corners(&self) -> (Vec3, Vec3) {
-        (self.min, self.max)
-    }
-
     pub fn sweep_through_voxel(
         &mut self,
         voxel: &impl Voxel,
         mut delta: Vec3,
-        mut material_coef: f32,
+        material_coef: f32,
     ) -> Vec3 {
         if voxel.check_volume_for_collision(self.corners_blocked()) {
             return self.player_pos() + delta;
@@ -174,7 +170,7 @@ impl Aabb {
         &mut self,
         voxel: &impl Voxel,
         mut delta: Vec3,
-        mut material_coef: f32,
+        material_coef: f32,
     ) -> Vec3 {
         loop {
             let max_element = delta.abs().max_element();
@@ -268,11 +264,11 @@ impl Aabb {
     }
 }
 
+#[allow(unused)]
 #[cfg(test)]
 mod test {
-    use glam::{IVec3, Vec3};
+    use glam::IVec3;
 
-    use crate::physics::Aabb;
     use crate::physics::Voxel;
 
     struct SingleSolid(IVec3);
