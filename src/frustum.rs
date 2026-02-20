@@ -135,6 +135,7 @@ impl Frustum {
             }
         }
         println!("flood_fill: {}", now.elapsed().as_micros());
+        println!("number of chunks: {}", chunks.len());
 
         chunks
     }
