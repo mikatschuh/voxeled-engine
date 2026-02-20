@@ -38,5 +38,5 @@ pub use threadpool::Threadpool;
 pub use time::{DeltaTime, DeltaTimeMeter};
 pub use voxel::VoxelType;
 pub use world_gen::{
-    Box, ComposeableGenerator, Gen2D, Gen3D, Layer, Seed, ShapeGenerator, generators,
+    Box, ComposeableGenerator, Gen2D, Gen3D, Generator, Layer, Seed, ShapeGenerator, generators,
 };
