@@ -30,13 +30,23 @@ impl<G: Generator> Server<G> {
         }
     }
 
-    pub fn get_mesh(&mut self, frustum: Frustum, threadpool: &mut Threadpool<G>) -> Mesh {
+    pub fn get_mesh(
+        &mut self,
+        frustum: Frustum,
+        use_new_code: bool,
+        threadpool: &mut Threadpool<G>,
+    ) -> Mesh {
         let mut mesh = Mesh::with_capacity(24_000_000);
 
         let cam_chunk_pos = (frustum.cam_pos / 32.0).as_ivec3();
 
         let now = Instant::now();
-        let chunks: Vec<ChunkID> = frustum.flood_fill(); // cube(8, 0).collect();
+
+        let chunks: Vec<ChunkID> = if use_new_code {
+            frustum.flood_fill()
+        } else {
+            frustum.chunk_ids().collect()
+        };
         println!("flood_fill: {}", now.elapsed().as_micros());
 
         chunks.iter().copied().for_each(|chunk_id| {
