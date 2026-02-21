@@ -38,4 +38,6 @@ pub use server::Server;
 pub use threadpool::Threadpool;
 pub use time::{DeltaTime, DeltaTimeMeter};
 pub use voxel::VoxelType;
-pub use world_gen::{ComposeableGenerator, Gen2D, Gen3D, GenBox, Seed};
+pub use world_gen::{
+    ComposeableGenerator, Gen2D, Gen3D, GenBox, Generator, MaterialGenerator, Seed,
+};
