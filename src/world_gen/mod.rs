@@ -138,7 +138,7 @@ impl Gen2D {
                 for y in 0..32 {
                     let pos_y = (y as i32 + chunk.pos.y * 32) << chunk.lod;
                     plane[y][z] = if pos_y
-                        < ((2.0_f64.powf(height as f64) * self.y_scale) - self.base_height) as i32
+                        < ((2.0_f64.powf(height as f64 * self.y_scale)) - self.base_height) as i32
                     {
                         material(IVec3::new(pos_x, pos_y, pos_z))
                     } else {
