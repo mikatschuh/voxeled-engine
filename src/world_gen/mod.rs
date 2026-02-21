@@ -22,29 +22,29 @@ pub enum ShapeGenerator {
 
 #[derive(Debug, Clone)]
 pub struct Gen2D {
-    noise: Noise,
-    octaves: usize,
-    base_height: f64,
-    x_scale: f64,
-    y_scale: f64,
-    z_scale: f64,
+    pub noise: Noise,
+    pub octaves: usize,
+    pub base_height: f64,
+    pub x_scale: f64,
+    pub y_scale: f64,
+    pub z_scale: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct Gen3D {
-    noise: Noise,
-    octaves: usize,
-    x_scale: f64,
-    y_scale: f64,
-    z_scale: f64,
-    exponent: f64,
-    threshold: f64,
+    pub noise: Noise,
+    pub octaves: usize,
+    pub x_scale: f64,
+    pub y_scale: f64,
+    pub z_scale: f64,
+    pub exponent: f64,
+    pub threshold: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct Box {
-    min: IVec3,
-    max: IVec3,
+    pub min: IVec3,
+    pub max: IVec3,
 }
 
 #[derive(Debug, Clone)]
