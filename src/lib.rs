@@ -33,10 +33,9 @@ pub fn block_coord(n: f32) -> i32 {
 pub use chunk::ChunkID;
 pub use frustum::Frustum;
 pub use mesh::{Instance, Mesh, TextureID};
+pub use random::Noise;
 pub use server::Server;
 pub use threadpool::Threadpool;
 pub use time::{DeltaTime, DeltaTimeMeter};
 pub use voxel::VoxelType;
-pub use world_gen::{
-    Box, ComposeableGenerator, Gen2D, Gen3D, Generator, Layer, Seed, ShapeGenerator, generators,
-};
+pub use world_gen::{ComposeableGenerator, Gen2D, Gen3D, GenBox, Seed};

@@ -1,7 +1,8 @@
 use std::ops::Add;
 
+use super::{Layer, ShapeGenerator};
 use crate::{
-    ComposeableGenerator, Gen2D, Gen3D, Layer, ShapeGenerator,
+    ComposeableGenerator, Gen2D, Gen3D, GenBox,
     random::Noise,
     world_gen::{MaterialGenerator, Seed},
 };
@@ -16,6 +17,33 @@ impl Add for ComposeableGenerator {
 }
 
 impl ComposeableGenerator {
+    pub fn gen_3d(gen3d: Gen3D, material: Option<MaterialGenerator>) -> Self {
+        Self {
+            gen_stack: vec![Layer {
+                generator: ShapeGenerator::Gen3D(gen3d),
+                material,
+            }],
+        }
+    }
+
+    pub fn gen_2d(gen2d: Gen2D, material: Option<MaterialGenerator>) -> Self {
+        Self {
+            gen_stack: vec![Layer {
+                generator: ShapeGenerator::Gen2D(gen2d),
+                material,
+            }],
+        }
+    }
+
+    pub fn gen_box(box_gen: GenBox, material: Option<MaterialGenerator>) -> Self {
+        Self {
+            gen_stack: vec![Layer {
+                generator: ShapeGenerator::Box(box_gen),
+                material,
+            }],
+        }
+    }
+
     pub fn mountains_and_valleys(seed: Seed) -> Self {
         Self {
             gen_stack: vec![Layer {

@@ -17,7 +17,7 @@ pub trait Generator: Clone + Send + Sync + 'static {
 pub enum ShapeGenerator {
     Gen2D(Gen2D),
     Gen3D(Gen3D),
-    Box(Box),
+    Box(GenBox),
 }
 
 #[derive(Debug, Clone)]
@@ -42,7 +42,7 @@ pub struct Gen3D {
 }
 
 #[derive(Debug, Clone)]
-pub struct Box {
+pub struct GenBox {
     pub min: IVec3,
     pub max: IVec3,
 }
@@ -84,7 +84,7 @@ impl MaterialGenerator {
 }
 
 #[derive(Debug, Clone)]
-pub struct Layer {
+struct Layer {
     generator: ShapeGenerator,
     material: Option<MaterialGenerator>,
 }
@@ -185,7 +185,7 @@ impl Gen3D {
     }
 }
 
-impl Box {
+impl GenBox {
     fn generate(
         &self,
         chunk: ChunkID,

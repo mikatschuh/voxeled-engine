@@ -32,6 +32,7 @@ impl<G: Generator> Server<G> {
         }
     }
 
+    #[allow(unused)]
     pub fn get_mesh(
         &mut self,
         frustum: Frustum,
