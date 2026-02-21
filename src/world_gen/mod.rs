@@ -77,8 +77,8 @@ impl MaterialGenerator {
         );
 
         match mat {
-            _ if mat >= self.threshold => VoxelType::CrackedStone,
-            _ => VoxelType::Stone,
+            _ if mat >= self.threshold => VoxelType::Stone,
+            _ => VoxelType::Dirt,
         }
     }
 }
