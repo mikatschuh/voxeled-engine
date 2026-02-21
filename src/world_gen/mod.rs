@@ -142,7 +142,7 @@ impl Gen2D {
                     {
                         material(IVec3::new(pos_x, pos_y, pos_z))
                     } else {
-                        VoxelType::Air
+                        continue;
                     }
                 }
             }
@@ -174,8 +174,8 @@ impl Gen3D {
                         self.octaves,
                     );
 
-                    *voxel = if val.powf(self.exponent as f64) <= self.threshold {
-                        VoxelType::Air
+                    *voxel = if val.powf(self.exponent as f64) < self.threshold {
+                        continue;
                     } else {
                         material(pos)
                     }
@@ -202,9 +202,9 @@ impl GenBox {
                     );
 
                     *voxel = if pos.cmpge(self.min).all() && pos.cmplt(self.max).all() {
-                        VoxelType::Air
-                    } else {
                         material(pos)
+                    } else {
+                        continue;
                     }
                 }
             }
