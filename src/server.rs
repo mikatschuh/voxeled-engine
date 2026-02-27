@@ -5,11 +5,12 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::chunk::{ChunkID, Level};
-use crate::frustum::{Frustum, LodLevel, chunk_overlaps};
+use crate::flood_fill::chunk_overlaps;
+use crate::frustum::LodLevel;
 use crate::job::Job;
+use crate::mesh::Mesh;
 use crate::physics::Voxel;
 use crate::world_gen::Generator;
-use crate::{mesh::Mesh, threadpool::Threadpool};
 
 pub const MAX_LOD: LodLevel = 16;
 
@@ -33,17 +34,10 @@ impl<G: Generator> Server<G> {
     }
 
     #[allow(unused)]
-    pub fn get_mesh(
-        &mut self,
-        frustum: Frustum,
-        use_new_code: bool,
-        threadpool: &mut Threadpool<G>,
-    ) -> Mesh {
+    pub fn get_mesh(&mut self, chunks: Vec<ChunkID>, use_new_code: bool) -> Mesh {
         let mut mesh = Mesh::with_capacity(24_000_000);
 
-        let cam_chunk_pos = (frustum.cam_pos / 32.0).as_ivec3();
-
-        let chunks: Vec<ChunkID> = frustum.flood_fill();
+        let cam_chunk_pos = IVec3::splat(0);
 
         chunks.iter().copied().for_each(|chunk_id| {
             if self.mesh_ready(chunk_id) {

@@ -1,13 +1,16 @@
-use glam::{IVec3, Vec3};
+use glam::Vec3;
 
 use std::collections::{HashSet, VecDeque};
 
-use crate::chunk::ChunkID;
+use crate::{
+    chunk::ChunkID,
+    flood_fill::{chunk_neighbors, lod_at_dst},
+};
 
 pub type LodLevel = u16;
 
 /// Chunks are 32^3
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Frustum {
     pub cam_pos: Vec3,
     pub direction: Vec3,
@@ -20,13 +23,30 @@ pub struct Frustum {
     pub full_detail_range: f32,
 }
 
-impl Frustum {
-    pub fn flood_fill(self) -> Vec<ChunkID> {
-        if self.max_chunks == 0 {
-            return Vec::new();
-        }
+#[derive(Debug, Clone)]
+pub struct FrustumAllocations {
+    pub chunks: Vec<ChunkID>,
+    pub already_queued: HashSet<ChunkID>,
+    pub candidates: VecDeque<ChunkID>,
+    pub next_lod_candidates: VecDeque<ChunkID>,
+}
 
-        let mut chunks: Vec<ChunkID> = Vec::with_capacity(self.max_chunks);
+impl FrustumAllocations {
+    pub fn default(max_chunks: usize) -> Self {
+        Self {
+            chunks: Vec::with_capacity(max_chunks),
+            already_queued: HashSet::with_capacity(max_chunks * 2),
+            candidates: VecDeque::with_capacity(max_chunks * 2),
+            next_lod_candidates: VecDeque::with_capacity(max_chunks * 2),
+        }
+    }
+}
+
+impl Frustum {
+    pub fn flood_fill(self, buffers: &mut FrustumAllocations) {
+        if self.max_chunks == 0 {
+            return;
+        }
 
         let cam_pos = self.cam_pos / 32.0;
 
@@ -74,77 +94,42 @@ impl Frustum {
                 && !outside_plane(top_normal, 0.0)
         };
 
-        let mut already_queued: HashSet<ChunkID> = HashSet::with_capacity(self.max_chunks * 2);
-        let mut candidates: VecDeque<ChunkID> = VecDeque::with_capacity(self.max_chunks * 2);
+        buffers.chunks.clear();
 
         let base_chunk = ChunkID::from_pos(cam_pos, 0);
-        candidates.push_back(base_chunk);
-        already_queued.insert(base_chunk);
+        buffers.candidates.push_back(base_chunk);
+        buffers.already_queued.insert(base_chunk);
 
-        let mut next_lods_candidates: VecDeque<ChunkID> =
-            VecDeque::with_capacity(self.max_chunks * 2);
-
-        while let Some(chunk) = candidates.pop_front() {
+        while let Some(chunk) = buffers.candidates.pop_front() {
             if in_frustum(chunk) {
-                chunks.push(chunk);
-                if chunks.len() >= self.max_chunks {
+                buffers.chunks.push(chunk);
+                if buffers.chunks.len() >= self.max_chunks {
                     break;
                 }
 
                 for neighbor in chunk_neighbors(chunk) {
-                    if already_queued.insert(neighbor) {
+                    if buffers.already_queued.insert(neighbor) {
                         let lod = lod_at_dst(
                             self.full_detail_range,
                             cam_pos,
                             (neighbor.total_pos() & !1).as_vec3(),
                         );
                         let parent = neighbor.parent();
-                        if lod > chunk.lod && already_queued.insert(parent) {
-                            next_lods_candidates.push_back(parent);
+                        if lod > chunk.lod && buffers.already_queued.insert(parent) {
+                            buffers.next_lod_candidates.push_back(parent);
                         } else if lod == chunk.lod {
-                            candidates.push_back(neighbor);
+                            buffers.candidates.push_back(neighbor);
                         }
                     }
                 }
             }
 
-            if candidates.is_empty() {
-                std::mem::swap(&mut candidates, &mut next_lods_candidates);
+            if buffers.candidates.is_empty() {
+                std::mem::swap(&mut buffers.candidates, &mut buffers.next_lod_candidates);
             }
         }
-
-        chunks
+        buffers.already_queued.clear();
+        buffers.candidates.clear();
+        buffers.next_lod_candidates.clear();
     }
-}
-
-fn chunk_neighbors(c: ChunkID) -> [ChunkID; 6] {
-    let pos = c.pos;
-    [
-        pos + IVec3::NEG_X,
-        pos + IVec3::X,
-        pos + IVec3::NEG_Y,
-        pos + IVec3::Y,
-        pos + IVec3::NEG_Z,
-        pos + IVec3::Z,
-    ]
-    .map(|p| ChunkID::new(c.lod, p))
-}
-
-fn lod_at_dst(full_detail_range: f32, cam_chunk_pos: Vec3, chunk_coord: Vec3) -> LodLevel {
-    let dst = cam_chunk_pos.distance(chunk_coord);
-    (dst / full_detail_range).ceil().log2().ceil().min(65535.) as u16
-}
-
-pub fn chunk_overlaps(a: &ChunkID, b: ChunkID) -> bool {
-    if a.lod == b.lod {
-        return a.pos == b.pos;
-    }
-
-    if a.lod > b.lod {
-        let shift = (a.lod - b.lod) as i32;
-        return (b.pos >> shift) == a.pos;
-    }
-
-    let shift = (b.lod - a.lod) as i32;
-    (a.pos >> shift) == b.pos
 }
