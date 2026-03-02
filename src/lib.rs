@@ -34,13 +34,14 @@ pub fn block_coord(n: f32) -> i32 {
     n.floor() as i32
 }
 
+pub use chunk_format::{Chunk, VoxelType};
 pub use engine::ChunkID;
 pub use frustum::{Frustum, FrustumAllocations};
 pub use mesh::{Instance, Mesh, TextureID};
 pub use mpsc::{Receiver as MpscReceiver, Sender as MpscSender, new as mpsc_channel};
 pub use random::Noise;
 pub use time::{DeltaTime, DeltaTimeMeter};
-pub use voxel::VoxelType;
+pub use voxel::VoxelData3D;
 pub use world_gen::{
     ComposableGenerator, Gen2D, Gen3D, GenBox, Generator, MaterialGenerator, Seed,
 };

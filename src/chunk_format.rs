@@ -10,7 +10,6 @@ use crate::bitvec::PackedVec32;
 pub type VoxelType = u16;
 pub type PaletteID = u16;
 
-const FREE_LIST_MAXIMUM_SIZE: usize = 32;
 pub struct Chunk {
     palette_index_size: u8, // number of bits needed to represent every palette entry
     type_to_id: HashMap<VoxelType, PaletteID>,
@@ -25,11 +24,14 @@ pub struct Chunk {
 
 impl Chunk {
     pub fn from_buffer(buffer: &[[[VoxelType; 32]; 32]; 32]) -> Self {
-        let mut voxel_type_uses = [0_u16; 65_536];
-        buffer
+        let every_input_voxel = buffer
             .iter()
             .flat_map(|plane| plane.iter())
-            .flat_map(|collum| collum.iter())
+            .flat_map(|collum| collum.iter());
+
+        let mut voxel_type_uses = [0_u16; 65_536];
+        every_input_voxel
+            .clone()
             .for_each(|v| voxel_type_uses[*v as usize] += 1);
 
         let mut type_to_id: HashMap<VoxelType, u16> = HashMap::new();
@@ -39,8 +41,9 @@ impl Chunk {
             let voxel_type = voxel_type as VoxelType;
 
             if num_of_uses > 0 {
-                let palette_id = palette.len() as VoxelType;
+                let palette_id = palette.len() as PaletteID;
                 type_to_id.insert(voxel_type, palette_id);
+
                 palette.push(voxel_type);
                 palette_num_of_uses.push(num_of_uses);
             }
@@ -48,13 +51,12 @@ impl Chunk {
 
         let palette_index_size = log2_round_down(palette.len());
 
-        let mut voxel = PackedVec32::new(32_768, palette_index_size);
-        buffer
-            .into_iter()
-            .flat_map(|plane| plane.iter())
-            .flat_map(|collum| collum.iter())
-            .enumerate()
-            .for_each(|(i, v)| voxel.set(i, *v as u32));
+        let mut voxel = PackedVec32::new(32 * 32 * 32, palette_index_size);
+        if palette_index_size != 0 {
+            every_input_voxel
+                .enumerate()
+                .for_each(|(i, v)| voxel.set(i, *type_to_id.get(v).unwrap() as u32));
+        }
 
         Self {
             palette_index_size,

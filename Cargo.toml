@@ -11,6 +11,7 @@ tokio = "*"
 crossbeam = "0.8.4"
 num_cpus = "1.16"
 rand = "0.8.5"
+rand_distr = "0.4"
 noise = "*"
 bytemuck = { version = "1.16", features = ["derive"] }
 wgpu = "25.0"

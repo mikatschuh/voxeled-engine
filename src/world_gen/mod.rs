@@ -1,9 +1,9 @@
 use glam::IVec3;
 
 use crate::{
-    ChunkID, VoxelType,
+    ChunkID,
     random::Noise,
-    voxel::{self, VoxelData3D},
+    voxel::{self, VoxelData3D, VoxelType},
 };
 
 pub mod generators;
