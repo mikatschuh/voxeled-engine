@@ -1,9 +1,18 @@
-use crate::{ChunkID, ComposeableGenerator, Generator, mpsc_channel, worker::Runable};
+use crate::{
+    ChunkID, ComposableGenerator, Generator, chunk::BitMap3D, mpsc, voxel::VoxelData3D,
+    worker::Runable,
+};
 
 #[derive(Debug, Clone)]
 pub struct Context {
-    pub world_generator: ComposeableGenerator,
-    pub meshes: mpsc_channel::Sender<()>,
+    pub world_generator: ComposableGenerator,
+
+    pub meshes: mpsc::Sender<()>,
+}
+
+pub struct ChunkSubmission {
+    data: VoxelData3D,
+    collider: BitMap3D,
 }
 
 #[derive(Debug)]

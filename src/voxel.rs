@@ -2,7 +2,7 @@ use crate::mesh::TextureID;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoxelType {
-    Air,
+    Air = 1,
     CrackedStone,
     Stone,
     Dirt,
@@ -49,7 +49,7 @@ impl VoxelType {
     /// 5 = +z
     /// ```
     pub fn texture_id(self, orientation: u8) -> TextureID {
-        self as u16 - 1
+        self as u16 - 2
     }
 }
 

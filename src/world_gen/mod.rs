@@ -90,11 +90,11 @@ struct Layer {
 }
 
 #[derive(Debug, Clone)]
-pub struct ComposeableGenerator {
+pub struct ComposableGenerator {
     gen_stack: Vec<Layer>,
 }
 
-impl Generator for ComposeableGenerator {
+impl Generator for ComposableGenerator {
     fn generate(&self, chunk: ChunkID) -> VoxelData3D {
         let mut voxel = voxel::fill(VoxelType::Air);
         for layer in self.gen_stack.iter() {

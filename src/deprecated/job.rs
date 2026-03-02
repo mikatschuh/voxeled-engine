@@ -3,7 +3,8 @@ use std::{sync::Arc, thread};
 use crossbeam::sync::ShardedLock;
 
 use crate::{
-    chunk::{Chunk, ChunkID, DataState, Level},
+    chunk::{Chunk, DataState, Level},
+    engine::ChunkID,
     mesh::Mesh,
     meshing::{generate_mesh, map_visible},
     world_gen::Generator,

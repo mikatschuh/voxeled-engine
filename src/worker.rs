@@ -6,12 +6,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{
-    ChunkID,
-    spsc_channel::{self, TrySendError},
-};
+use crate::ChunkID;
 
 use parking_lot::RwLock;
+use rtrb::{PushError, RingBuffer};
 
 pub trait Runable<C> {
     fn run(self, debug_log: &mut Vec<String>, context: &mut C);
@@ -24,7 +22,7 @@ pub struct Threadpool<T: fmt::Debug + Runable<C>, C> {
     _phantom: PhantomData<C>,
 
     debug_log: Vec<Arc<RwLock<Vec<String>>>>, // for every worker
-    queues: Vec<spsc_channel::Sender<T>>,
+    queues: Vec<rtrb::Producer<T>>,
     workers: Vec<thread::JoinHandle<()>>,
 }
 
@@ -32,10 +30,11 @@ impl<T: fmt::Debug + Runable<C> + Send + 'static, C: Clone + Send + 'static> Thr
     pub fn new(num_of_workers: usize, context: C) -> Result<Self, io::Error> {
         let mut workers: Vec<thread::JoinHandle<()>> = Vec::with_capacity(num_of_workers);
         let mut debug_logs: Vec<Arc<RwLock<Vec<String>>>> = Vec::with_capacity(num_of_workers);
-        let mut queues: Vec<spsc_channel::Sender<T>> = Vec::with_capacity(num_of_workers);
+        let mut queues: Vec<rtrb::Producer<T>> = Vec::with_capacity(num_of_workers);
 
         for i in 0..num_of_workers {
-            let (task_sender, task_recv) = crate::spsc_channel::<T>(1000);
+            let (task_sender, mut task_recv) = RingBuffer::<T>::new(1000);
+
             let debug_log = Arc::new(RwLock::new(vec![]));
             let debug_log_cloned = debug_log.clone();
 
@@ -46,11 +45,7 @@ impl<T: fmt::Debug + Runable<C> + Send + 'static, C: Clone + Send + 'static> Thr
                 .spawn(move || {
                     let mut time_since_task = Instant::now();
                     loop {
-                        if task_recv.is_disconnected() {
-                            return;
-                        }
-
-                        while let Ok(task) = task_recv.try_recv() {
+                        while let Ok(task) = task_recv.pop() {
                             task.run(&mut debug_log.write(), &mut context);
                             time_since_task = Instant::now();
                         }
@@ -78,25 +73,25 @@ impl<T: fmt::Debug + Runable<C> + Send + 'static, C: Clone + Send + 'static> Thr
 
     pub fn submit(&mut self, worker: WorkerID, mut task: T) {
         loop {
-            match self.queues[worker].try_send(task) {
+            match self.queues[worker].push(task) {
                 Ok(_) => return,
                 Err(e) => match e {
-                    TrySendError::Full(t) => task = t,
-                    TrySendError::Disconnected(_) => panic!("worker died!"),
+                    PushError::Full(t) => task = t,
                 },
             }
+            std::hint::spin_loop()
         }
     }
 
     pub fn submit_with_chunk(&mut self, chunk: ChunkID, mut task: T) {
         loop {
-            match self.queues[bucket(chunk, self.workers.len())].try_send(task) {
+            match self.queues[bucket(chunk, self.workers.len())].push(task) {
                 Ok(_) => return,
                 Err(e) => match e {
-                    TrySendError::Full(t) => task = t,
-                    TrySendError::Disconnected(_) => panic!("worker died!"),
+                    PushError::Full(t) => task = t,
                 },
             }
+            std::hint::spin_loop();
         }
     }
 }

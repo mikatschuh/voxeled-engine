@@ -1,7 +1,7 @@
 use glam::IVec3;
 use std::ops;
 
-use crate::frustum::LodLevel;
+use crate::engine::LodLevel;
 
 pub type TextureID = u16;
 

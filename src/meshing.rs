@@ -1,12 +1,10 @@
 use glam::IVec3;
 
 use crate::{
-    chunk::{ChunkID, Level},
+    ChunkID,
     mesh::Mesh,
     voxel::{self, VoxelData3D, VoxelType},
 };
-
-pub type BitMap3D = [[u32; 32]; 32];
 
 fn get_data(level: &Level, chunk_id: ChunkID) -> VoxelData3D {
     level

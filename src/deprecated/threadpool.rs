@@ -2,7 +2,7 @@ use crossbeam::deque::Injector;
 use parking_lot::RwLock;
 use std::{mem, sync::Arc, thread};
 
-use crate::{job::Job, world_gen::Generator};
+use crate::world_gen::Generator;
 
 #[derive(Debug)]
 pub struct Threadpool<G: Generator> {
@@ -70,7 +70,6 @@ impl<G: Generator> Threadpool<G> {
         out
     }
 
-    /// A function to add priority tasks. Returns the task if the queue was full.
     pub fn push(&mut self, task: Job<G>) {
         self.task_queue.push(task);
     }

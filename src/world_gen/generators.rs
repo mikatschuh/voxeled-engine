@@ -2,12 +2,12 @@ use std::ops::Add;
 
 use super::{Layer, ShapeGenerator};
 use crate::{
-    ComposeableGenerator, Gen2D, Gen3D, GenBox,
+    ComposableGenerator, Gen2D, Gen3D, GenBox,
     random::Noise,
     world_gen::{MaterialGenerator, Seed},
 };
 
-impl Add for ComposeableGenerator {
+impl Add for ComposableGenerator {
     type Output = Self;
     fn add(mut self, mut rhs: Self) -> Self::Output {
         self.gen_stack.append(&mut rhs.gen_stack);
@@ -16,7 +16,7 @@ impl Add for ComposeableGenerator {
     }
 }
 
-impl ComposeableGenerator {
+impl ComposableGenerator {
     pub fn gen_3d(gen3d: Gen3D, material: Option<MaterialGenerator>) -> Self {
         Self {
             gen_stack: vec![Layer {

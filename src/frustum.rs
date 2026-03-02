@@ -3,11 +3,9 @@ use glam::Vec3;
 use std::collections::{HashSet, VecDeque};
 
 use crate::{
-    chunk::ChunkID,
+    engine::ChunkID,
     flood_fill::{chunk_neighbors, lod_at_dst},
 };
-
-pub type LodLevel = u16;
 
 /// Chunks are 32^3
 #[derive(Debug, Clone)]

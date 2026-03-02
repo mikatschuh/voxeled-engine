@@ -23,3 +23,15 @@ criterion = "0.4"
 [[bench]]
 name = "frustum_flood_fill"
 harness = false
+
+[[bench]]
+name = "channel_throughput"
+harness = false
+
+[[bench]]
+name = "chunk_generation"
+harness = false
+
+[[bench]]
+name = "chunk_format"
+harness = false

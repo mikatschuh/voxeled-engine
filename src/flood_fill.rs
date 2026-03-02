@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 
 use glam::{IVec3, Vec3};
 
-use crate::{ChunkID, frustum::LodLevel};
+use crate::{ChunkID, engine::LodLevel};
 
 pub struct SphereConfig {
     pub full_detail_range: f32,
