@@ -7,10 +7,9 @@ pub type TextureID = u16;
 
 /// The kind states the orientation and the texture.
 /// It has the following layout:
-/// ```
 ///                             LODs|                        texture|
 /// |0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|
-/// ```
+///
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Instance {

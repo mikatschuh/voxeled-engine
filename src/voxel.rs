@@ -40,14 +40,13 @@ impl VoxelType {
     }
 
     #[allow(unused)]
-    /// ```
+    /// orientations
     /// 0 = -x
     /// 1 = +x
     /// 2 = -y
     /// 3 = +y
     /// 4 = -z
     /// 5 = +z
-    /// ```
     pub fn texture_id(self, orientation: u8) -> TextureID {
         self as u16 - 2
     }
