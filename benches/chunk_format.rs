@@ -1,66 +1,136 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use glam::UVec3;
-use rand::{Rng, random, thread_rng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use voxine::{Chunk, VoxelType};
 
-fn exp_u16<R: Rng + ?Sized>(rng: &mut R, lambda: f64) -> u16 {
-    let max = u16::MAX as f64;
-    let u: f64 = rng.r#gen(); // [0,1)
-    // Trunkierte Exp auf [0,1], dann auf [0, u16::MAX] skalieren
-    let x01 = -((1.0 - u * (1.0 - (-lambda).exp())).ln()) / lambda;
-    (x01 * max).round() as u16
+const CHUNK_SIZE: usize = 32;
+const CHUNK_VOLUME: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+const OPS: usize = 100_000;
+
+#[inline(always)]
+fn coords_to_1d_index(coord: UVec3) -> usize {
+    (coord.x * CHUNK_SIZE as u32 * CHUNK_SIZE as u32 + coord.y * CHUNK_SIZE as u32 + coord.z)
+        as usize
 }
 
-fn benchmark_chunk_editing(c: &mut Criterion) {
-    let mut group = c.benchmark_group("channel_throughput");
-    group.sample_size(20);
-
-    let mut rng = thread_rng();
-    let replaces = (0..100_000)
+fn gen_ops(seed: u64, ops: usize, value_range: u16) -> Vec<(UVec3, VoxelType)> {
+    let mut rng = StdRng::seed_from_u64(seed);
+    (0..ops)
         .map(|_| {
             (
                 UVec3::new(
-                    random::<u32>() & 31,
-                    random::<u32>() & 31,
-                    random::<u32>() & 31,
+                    rng.gen_range(0..CHUNK_SIZE as u32),
+                    rng.gen_range(0..CHUNK_SIZE as u32),
+                    rng.gen_range(0..CHUNK_SIZE as u32),
                 ),
-                (exp_u16(&mut rng, 32.0) as f32).clamp(0., u16::MAX as f32) as u16,
+                rng.gen_range(0..value_range),
             )
         })
-        .collect::<Vec<(UVec3, VoxelType)>>();
-
-    let mut naiv_chunk = [0_u16; 32 * 32 * 32];
-
-    #[inline(always)]
-    fn coords_to_1d_index(coord: UVec3) -> usize {
-        (coord.x * 32 * 32 + coord.y * 32 + coord.z) as usize
-    }
-
-    group.bench_function(format!("naiv set {} replaces", replaces.len()), |b| {
-        b.iter(|| {
-            for replace in black_box(replaces.iter()) {
-                naiv_chunk[coords_to_1d_index(replace.0)] = replace.1
-            }
-        });
-    });
-
-    let mut optimized_chunk = Chunk::from_buffer(&[0_u16; 32 * 32 * 32]);
-
-    group.bench_function(format!("Chunk::set {} replaces", replaces.len()), |b| {
-        b.iter(|| {
-            for replace in black_box(replaces.iter()) {
-                optimized_chunk.set(replace.0, replace.1);
-            }
-        });
-    });
-
-    assert_eq!(optimized_chunk.to_buffer(), naiv_chunk);
-    println!(
-        "\nnaiv memory usage: {}kB\noptimized memory usage: {}kB\n",
-        (32 * 32 * 32 * 2) as f32 / 1000.,
-        optimized_chunk.calculate_memory_usage() as f32 / 1000.
-    );
+        .collect()
 }
 
-criterion_group!(benches, benchmark_chunk_editing);
+fn bench_bulk_random_writes(c: &mut Criterion) {
+    let mut group = c.benchmark_group("chunk_set_bulk_random");
+    group.sample_size(30);
+    group.throughput(Throughput::Elements(OPS as u64));
+
+    let packed_ops = gen_ops(0xA11CE, OPS, 16);
+    let dense_ops = gen_ops(0xBEE5, OPS, u16::MAX);
+
+    let mut naive = [0_u16; CHUNK_VOLUME];
+    group.bench_with_input(
+        BenchmarkId::new("naive_dense_array", OPS),
+        &packed_ops,
+        |b, ops| {
+            b.iter(|| {
+                for &(coord, voxel) in black_box(ops.iter()) {
+                    naive[coords_to_1d_index(coord)] = voxel;
+                }
+            });
+        },
+    );
+
+    let mut packed_chunk = Chunk::from_buffer(&[0_u16; CHUNK_VOLUME]);
+    group.bench_with_input(
+        BenchmarkId::new("chunk_set_packed", OPS),
+        &packed_ops,
+        |b, ops| {
+            b.iter(|| {
+                for &(coord, voxel) in black_box(ops.iter()) {
+                    packed_chunk.set(coord, voxel);
+                }
+            });
+        },
+    );
+
+    let mut dense_init = [0_u16; CHUNK_VOLUME];
+    for (i, v) in dense_init.iter_mut().enumerate() {
+        *v = (i as u16).wrapping_mul(13).wrapping_add(7);
+    }
+    let mut dense_fallback_chunk = Chunk::from_buffer(&dense_init);
+    group.bench_with_input(
+        BenchmarkId::new("chunk_set_dense_fallback", OPS),
+        &dense_ops,
+        |b, ops| {
+            b.iter(|| {
+                for &(coord, voxel) in black_box(ops.iter()) {
+                    dense_fallback_chunk.set(coord, voxel);
+                }
+            });
+        },
+    );
+
+    group.finish();
+}
+
+fn bench_single_write_hot_path(c: &mut Criterion) {
+    let mut group = c.benchmark_group("chunk_set_single_write");
+    group.sample_size(40);
+    group.throughput(Throughput::Elements(1));
+
+    let packed_ops = gen_ops(0x5EED, OPS, 16);
+    let dense_ops = gen_ops(0xD3E5E, OPS, u16::MAX);
+    let mut idx = 0usize;
+
+    let mut naive = [0_u16; CHUNK_VOLUME];
+    group.bench_function("naive_dense_array", |b| {
+        b.iter(|| {
+            let (coord, voxel) = black_box(packed_ops[idx % packed_ops.len()]);
+            idx = idx.wrapping_add(1);
+            naive[coords_to_1d_index(coord)] = voxel;
+        });
+    });
+
+    let mut chunk = Chunk::from_buffer(&[0_u16; CHUNK_VOLUME]);
+    let mut idx2 = 0usize;
+    group.bench_function("chunk_set_packed", |b| {
+        b.iter(|| {
+            let (coord, voxel) = black_box(packed_ops[idx2 % packed_ops.len()]);
+            idx2 = idx2.wrapping_add(1);
+            chunk.set(coord, voxel);
+        });
+    });
+
+    let mut dense_init = [0_u16; CHUNK_VOLUME];
+    for (i, v) in dense_init.iter_mut().enumerate() {
+        *v = (i as u16).wrapping_mul(13).wrapping_add(7);
+    }
+    let mut chunk_dense_fallback = Chunk::from_buffer(&dense_init);
+    let mut idx3 = 0usize;
+    group.bench_function("chunk_set_dense_fallback", |b| {
+        b.iter(|| {
+            let (coord, voxel) = black_box(dense_ops[idx3 % dense_ops.len()]);
+            idx3 = idx3.wrapping_add(1);
+            chunk_dense_fallback.set(coord, voxel);
+        });
+    });
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_bulk_random_writes,
+    bench_single_write_hot_path
+);
 criterion_main!(benches);

@@ -9,10 +9,12 @@ use crate::{bitvec::PackedVec32, chunk::CHUNK_VOLUME};
 
 pub type VoxelType = u16;
 pub type PaletteID = u16;
+const UNCOMPRESSED_RECHECK_INTERVAL: usize = CHUNK_VOLUME;
 
 pub struct Chunk {
     count_of_change: usize,
     palette_data: Option<PaletteData>,
+    dense_data: Option<Box<[VoxelType; CHUNK_VOLUME]>>,
 
     voxel: PackedVec32, // bit-packed
 }
@@ -29,7 +31,7 @@ pub struct PaletteData {
 
 impl Chunk {
     pub fn from_buffer(buffer: &[VoxelType; CHUNK_VOLUME]) -> Self {
-        let every_input_voxel = buffer.clone().into_iter();
+        let every_input_voxel = buffer.iter().copied();
         Self::from_iterator(every_input_voxel)
     }
 
@@ -62,16 +64,16 @@ impl Chunk {
             + (CHUNK_VOLUME * palette_index_size as usize).div_ceil(32) * 4;
 
         if memory_usage > CHUNK_VOLUME * 2 {
-            let mut voxel = PackedVec32::new(CHUNK_VOLUME, 16);
-
+            let mut dense = Box::new([0_u16; CHUNK_VOLUME]);
             every_input_voxel
                 .enumerate()
-                .for_each(|(i, v)| voxel.set(i, v as u32));
+                .for_each(|(i, v)| dense[i] = v);
 
             return Self {
                 count_of_change: 0,
                 palette_data: None,
-                voxel,
+                dense_data: Some(dense),
+                voxel: PackedVec32::new(0, 1),
             };
         }
 
@@ -92,6 +94,7 @@ impl Chunk {
                 palette,
                 palette_rc,
             }),
+            dense_data: None,
             voxel,
         }
     }
@@ -104,7 +107,7 @@ impl Chunk {
                 p_data.palette[self.voxel.get(coords_to_1d_index(coord)) as usize]
             }
         } else {
-            self.voxel.get(coords_to_1d_index(coord)) as VoxelType
+            self.dense_data.as_ref().unwrap()[coords_to_1d_index(coord)]
         }
     }
 
@@ -112,10 +115,16 @@ impl Chunk {
         let index = coords_to_1d_index(coord);
 
         let Some(p_data) = &mut self.palette_data else {
-            self.voxel.set(index, voxel_type as u32);
+            let dense = self.dense_data.as_mut().unwrap();
+            let old = dense[index];
+            if old == voxel_type {
+                return;
+            }
 
-            if self.count_of_change >= 32 {
-                let every_input_voxel = (0..CHUNK_VOLUME).map(|i| self.voxel.get(i) as VoxelType);
+            dense[index] = voxel_type;
+
+            if self.count_of_change >= UNCOMPRESSED_RECHECK_INTERVAL {
+                let every_input_voxel = dense.iter().copied();
 
                 *self = Self::from_iterator(every_input_voxel);
                 return;
@@ -244,13 +253,13 @@ impl Chunk {
                 + (CHUNK_VOLUME * p_data.palette_index_size as usize).div_ceil(32) * 4;
 
             if memory_usage > CHUNK_VOLUME * 2 {
-                let mut voxel = PackedVec32::new(CHUNK_VOLUME, 16);
-
+                let mut dense = Box::new([0_u16; CHUNK_VOLUME]);
                 (0..CHUNK_VOLUME)
-                    .for_each(|i| voxel.set(i, p_data.palette[self.voxel.get(i) as usize] as u32));
+                    .for_each(|i| dense[i] = p_data.palette[self.voxel.get(i) as usize]);
 
-                self.voxel = voxel;
                 self.palette_data = None;
+                self.dense_data = Some(dense);
+                self.voxel = PackedVec32::new(0, 1);
             }
         }
     }
@@ -265,10 +274,7 @@ impl Chunk {
             }
             buffer
         } else {
-            let mut buffer = [0_u16; CHUNK_VOLUME];
-
-            (0..CHUNK_VOLUME).for_each(|i| buffer[i] = self.voxel.get(i) as VoxelType);
-            buffer
+            **self.dense_data.as_ref().unwrap()
         }
     }
 
@@ -283,7 +289,7 @@ impl Chunk {
             total += p_data.type_to_id.capacity() * 4;
             total += self.voxel.len() * self.voxel.bits_per_elem() as usize;
         } else {
-            total += self.voxel.len() * 2
+            total += CHUNK_VOLUME * 2
         }
         total
     }
