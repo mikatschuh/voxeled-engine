@@ -5,12 +5,15 @@ use std::{
 
 use glam::UVec3;
 
-use crate::{bitvec::PackedVec32, chunk::CHUNK_VOLUME};
+use crate::{
+    bitvec::PackedVec32,
+    chunk::{CHUNK_VOLUME, VoxelType, coords_to_1d_index},
+};
 
-pub type VoxelType = u16;
 pub type PaletteID = u16;
 const UNCOMPRESSED_RECHECK_INTERVAL: usize = CHUNK_VOLUME;
 
+#[derive(Clone, Debug)]
 pub struct Chunk {
     count_of_change: usize,
     palette_data: Option<PaletteData>,
@@ -19,6 +22,7 @@ pub struct Chunk {
     voxel: PackedVec32, // bit-packed
 }
 
+#[derive(Clone, Debug)]
 pub struct PaletteData {
     palette_index_size: u8, // number of bits needed to represent every palette entry
     type_to_id: HashMap<VoxelType, PaletteID>,
@@ -296,11 +300,6 @@ impl Chunk {
 }
 
 #[inline(always)]
-fn coords_to_1d_index(coord: UVec3) -> usize {
-    (coord.x * 32 * 32 + coord.y * 32 + coord.z) as usize
-}
-
-#[inline(always)]
 fn log2_round_down(x: usize) -> u8 {
     (x as f32).log2().ceil() as u8
 }
@@ -309,17 +308,9 @@ fn log2_round_down(x: usize) -> u8 {
 mod tests {
     use rand::{Rng, random, thread_rng};
 
-    use crate::chunk::CHUNK_VOLUME;
+    use crate::chunk::{CHUNK_VOLUME, idx_to_coord};
 
     use super::*;
-
-    fn idx_to_coord(i: usize) -> UVec3 {
-        let x = i / (32 * 32);
-        let yz = i % (32 * 32);
-        let y = yz / 32;
-        let z = yz % 32;
-        UVec3::new(x as u32, y as u32, z as u32)
-    }
 
     fn exp_u16<R: Rng + ?Sized>(rng: &mut R, lambda: f64) -> u16 {
         let max = u16::MAX as f64;

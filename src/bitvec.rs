@@ -97,13 +97,4 @@ impl PackedVec32 {
         }
         *self = out;
     }
-
-    /// Replace everything. No fit checks; values are truncated to width.
-    pub fn overwrite_from_values(&mut self, bits_per_elem: u8, values: &[u32]) {
-        let mut out = PackedVec32::new(values.len(), bits_per_elem);
-        for (i, &v) in values.iter().enumerate() {
-            out.set(i, v);
-        }
-        *self = out;
-    }
 }

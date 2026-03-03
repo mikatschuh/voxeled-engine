@@ -1,16 +1,17 @@
 use glam::IVec3;
 
 use crate::{
-    ChunkID,
+    ChunkID, VoxelType,
+    chunk::{DenseChunk, idx_to_coord},
     random::Noise,
-    voxel::{self, VoxelData3D, VoxelType},
+    voxel::{self, VoxelTypes},
 };
 
 pub mod generators;
 
 pub type Seed = u64;
 pub trait Generator: Clone + Send + Sync + 'static {
-    fn generate(&self, chunk_id: ChunkID) -> VoxelData3D;
+    fn generate(&self, chunk_id: ChunkID) -> DenseChunk;
 }
 
 #[derive(Debug, Clone)]
@@ -76,10 +77,10 @@ impl MaterialGenerator {
             self.octaves,
         );
 
-        match mat {
-            _ if mat >= self.threshold => VoxelType::Stone,
-            _ => VoxelType::Dirt,
-        }
+        (match mat {
+            _ if mat >= self.threshold => VoxelTypes::Stone,
+            _ => VoxelTypes::Dirt,
+        }) as u16
     }
 }
 
@@ -95,14 +96,14 @@ pub struct ComposableGenerator {
 }
 
 impl Generator for ComposableGenerator {
-    fn generate(&self, chunk: ChunkID) -> VoxelData3D {
-        let mut voxel = voxel::fill(VoxelType::Air);
+    fn generate(&self, chunk: ChunkID) -> DenseChunk {
+        let mut voxel = voxel::fill(VoxelTypes::Air as u16);
         for layer in self.gen_stack.iter() {
             let material = |pos: IVec3| {
                 layer
                     .material
                     .as_ref()
-                    .map_or(VoxelType::Air, |mat| mat.generate(pos))
+                    .map_or(VoxelTypes::Air as u16, |mat| mat.generate(pos))
             };
 
             match &layer.generator {
@@ -120,10 +121,10 @@ impl Gen2D {
     fn generate(
         &self,
         chunk: ChunkID,
-        voxel: &mut VoxelData3D,
+        voxel: &mut DenseChunk,
         material: impl Fn(IVec3) -> VoxelType,
     ) {
-        for (x, plane) in voxel.iter_mut().enumerate() {
+        for (x, plane) in voxel.chunks_mut(32 * 32).enumerate() {
             for z in 0..32 {
                 let pos_x = (x as i32 + chunk.pos.x * 32) << chunk.lod;
                 let pos_z = (z as i32 + chunk.pos.z * 32) << chunk.lod;
@@ -137,7 +138,7 @@ impl Gen2D {
                 );
                 for y in 0..32 {
                     let pos_y = (y as i32 + chunk.pos.y * 32) << chunk.lod;
-                    plane[y][z] = if pos_y
+                    plane[y * 32 + z] = if pos_y
                         < ((2.0_f64.powf(height as f64 * self.y_scale)) - self.base_height) as i32
                     {
                         material(IVec3::new(pos_x, pos_y, pos_z))
@@ -154,32 +155,30 @@ impl Gen3D {
     fn generate(
         &self,
         chunk: ChunkID,
-        voxel: &mut VoxelData3D,
+        voxel: &mut DenseChunk,
         material: impl Fn(IVec3) -> VoxelType,
     ) {
-        for (x, plane) in voxel.iter_mut().enumerate() {
-            for (y, row) in plane.iter_mut().enumerate() {
-                for (z, voxel) in row.iter_mut().enumerate() {
-                    let pos = IVec3::new(
-                        (x as i32 + chunk.pos.x * 32) << chunk.lod,
-                        (y as i32 + chunk.pos.y * 32) << chunk.lod,
-                        (z as i32 + chunk.pos.z * 32) << chunk.lod,
-                    );
+        for (i, voxel) in voxel.iter_mut().enumerate() {
+            let coord = idx_to_coord(i);
 
-                    let val = self.noise.get_octaves(
-                        pos.x as f64 / self.x_scale,
-                        pos.y as f64 / self.y_scale,
-                        pos.z as f64 / self.z_scale,
-                        1.,
-                        self.octaves,
-                    );
+            let pos = IVec3::new(
+                (coord.x as i32 + chunk.pos.x * 32) << chunk.lod,
+                (coord.y as i32 + chunk.pos.y * 32) << chunk.lod,
+                (coord.y as i32 + chunk.pos.z * 32) << chunk.lod,
+            );
 
-                    *voxel = if val.powf(self.exponent as f64) < self.threshold {
-                        continue;
-                    } else {
-                        material(pos)
-                    }
-                }
+            let val = self.noise.get_octaves(
+                pos.x as f64 / self.x_scale,
+                pos.y as f64 / self.y_scale,
+                pos.z as f64 / self.z_scale,
+                1.,
+                self.octaves,
+            );
+
+            *voxel = if val.powf(self.exponent as f64) < self.threshold {
+                continue;
+            } else {
+                material(pos)
             }
         }
     }
@@ -189,24 +188,22 @@ impl GenBox {
     fn generate(
         &self,
         chunk: ChunkID,
-        voxel: &mut VoxelData3D,
+        voxel: &mut DenseChunk,
         material: impl Fn(IVec3) -> VoxelType,
     ) {
-        for (x, plane) in voxel.iter_mut().enumerate() {
-            for (y, row) in plane.iter_mut().enumerate() {
-                for (z, voxel) in row.iter_mut().enumerate() {
-                    let pos = IVec3::new(
-                        (x as i32 + chunk.pos.x * 32) << chunk.lod,
-                        (y as i32 + chunk.pos.y * 32) << chunk.lod,
-                        (z as i32 + chunk.pos.z * 32) << chunk.lod,
-                    );
+        for (i, voxel) in voxel.iter_mut().enumerate() {
+            let coord = idx_to_coord(i);
 
-                    *voxel = if pos.cmpge(self.min).all() && pos.cmplt(self.max).all() {
-                        material(pos)
-                    } else {
-                        continue;
-                    }
-                }
+            let pos = IVec3::new(
+                (coord.x as i32 + chunk.pos.x * 32) << chunk.lod,
+                (coord.y as i32 + chunk.pos.y * 32) << chunk.lod,
+                (coord.z as i32 + chunk.pos.z * 32) << chunk.lod,
+            );
+
+            *voxel = if pos.cmpge(self.min).all() && pos.cmplt(self.max).all() {
+                material(pos)
+            } else {
+                continue;
             }
         }
     }
