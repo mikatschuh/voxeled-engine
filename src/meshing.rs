@@ -1,156 +1,93 @@
-use glam::IVec3;
+use glam::{IVec3, UVec3};
 
 use crate::{
     ChunkID,
+    chunk::{DenseChunk, coords_to_1d_index, idx_to_coord},
     mesh::Mesh,
-    voxel::{self, VoxelData3D, VoxelType},
+    voxel::{self, VoxelTypes},
 };
 
-fn get_data(level: &Level, chunk_id: ChunkID) -> VoxelData3D {
-    level
-        .chunk_op(chunk_id, |chunk| *chunk.voxel.read())
-        .flatten()
-        .unwrap_or_else(|| voxel::fill(VoxelType::Air))
-}
+pub type BitMap3D = [[u32; 32]; 32];
 
-pub fn get_axis_aligned_solid_maps(level: &Level, chunk: ChunkID) -> [BitMap3D; 3] {
-    let data = get_data(level, chunk);
-
+pub fn get_axis_aligned_solid_maps(data: &DenseChunk) -> [BitMap3D; 3] {
     let mut x_aligned = [[0; 32]; 32];
     let mut y_aligned = [[0; 32]; 32];
     let mut z_aligned = [[0; 32]; 32];
 
     // data setup
-    for (x, plane) in data.iter().enumerate() {
-        for (y, row) in plane.iter().enumerate() {
-            for (z, voxel) in row.iter().enumerate() {
-                let voxel_is_solid_u32 = voxel.is_solid_u32();
+    for (i, voxel) in data.iter().enumerate() {
+        let UVec3 { x, y, z } = idx_to_coord(i);
 
-                if voxel_is_solid_u32 > 0 {
-                    x_aligned[y][z] |= voxel_is_solid_u32 >> x;
-                    y_aligned[z][x] |= voxel_is_solid_u32 >> y;
-                    z_aligned[x][y] |= voxel_is_solid_u32 >> z;
-                }
-            }
+        let voxel_is_solid_u32 = voxel::is_solid_u32(*voxel);
+
+        if voxel_is_solid_u32 > 0 {
+            x_aligned[y as usize][z as usize] |= voxel_is_solid_u32 >> x;
+            y_aligned[z as usize][x as usize] |= voxel_is_solid_u32 >> y;
+            z_aligned[x as usize][y as usize] |= voxel_is_solid_u32 >> z;
         }
     }
     [x_aligned, y_aligned, z_aligned]
 }
 
-fn get_x_aligned_solid_map(level: &Level, chunk: ChunkID) -> BitMap3D {
-    let data = get_data(level, chunk);
-
+fn get_x_aligned_solid_map(data: &DenseChunk) -> BitMap3D {
     let mut x_aligned = [[0; 32]; 32];
 
     // data setup
-    for (x, plane) in data.iter().enumerate() {
-        for (y, row) in plane.iter().enumerate() {
-            for (z, voxel) in row.iter().enumerate() {
-                let voxel_is_solid_u32 = voxel.is_solid_u32();
+    for (i, voxel) in data.iter().enumerate() {
+        let UVec3 { x, y, z } = idx_to_coord(i);
 
-                if voxel_is_solid_u32 > 0 {
-                    x_aligned[y][z] |= voxel_is_solid_u32 >> x;
-                }
-            }
+        let voxel_is_solid_u32 = voxel::is_solid_u32(*voxel);
+
+        if voxel_is_solid_u32 > 0 {
+            x_aligned[y as usize][z as usize] |= voxel_is_solid_u32 >> x;
         }
     }
     x_aligned
 }
 
-fn get_y_aligned_solid_map(level: &Level, chunk: ChunkID) -> BitMap3D {
-    let data = get_data(level, chunk);
-
+fn get_y_aligned_solid_map(data: &DenseChunk) -> BitMap3D {
     let mut y_aligned = [[0; 32]; 32];
 
     // data setup
-    for (x, plane) in data.iter().enumerate() {
-        for (y, row) in plane.iter().enumerate() {
-            for (z, voxel) in row.iter().enumerate() {
-                let voxel_is_solid_u32 = voxel.is_solid_u32();
+    for (i, voxel) in data.iter().enumerate() {
+        let UVec3 { x, y, z } = idx_to_coord(i);
 
-                if voxel_is_solid_u32 > 0 {
-                    y_aligned[z][x] |= voxel_is_solid_u32 >> y;
-                }
-            }
+        let voxel_is_solid_u32 = voxel::is_solid_u32(*voxel);
+
+        if voxel_is_solid_u32 > 0 {
+            y_aligned[z as usize][x as usize] |= voxel_is_solid_u32 >> y;
         }
     }
     y_aligned
 }
 
-fn get_z_aligned_solid_map(level: &Level, chunk: ChunkID) -> BitMap3D {
-    let data = get_data(level, chunk);
+fn get_z_aligned_collider(data: &DenseChunk) -> BitMap3D {
     let mut z_aligned = [[0; 32]; 32];
 
     // data setup
-    for (x, plane) in data.iter().enumerate() {
-        for (y, row) in plane.iter().enumerate() {
-            for (z, voxel) in row.iter().enumerate() {
-                let voxel_is_solid_u32 = voxel.is_solid_u32();
+    for (i, voxel) in data.iter().enumerate() {
+        let UVec3 { x, y, z } = idx_to_coord(i);
 
-                if voxel_is_solid_u32 > 0 {
-                    z_aligned[x][y] |= voxel_is_solid_u32 >> z;
-                }
-            }
+        let voxel_is_solid_u32 = voxel::is_physically_solid_u32(*voxel);
+
+        if voxel_is_solid_u32 > 0 {
+            z_aligned[x as usize][y as usize] |= voxel_is_solid_u32 >> z;
         }
     }
     z_aligned
 }
 
-pub fn map_visible(level: &Level, chunk: ChunkID) -> [BitMap3D; 6] {
+/// 0 = -x
+/// 1 = +x
+/// 2 = -y
+/// 3 = +y
+/// 4 = -z
+/// 5 = +z
+pub fn map_visible(
+    [x_aligned, y_aligned, z_aligned]: &[BitMap3D; 3],
+    [nx, px, ny, py, nz, pz]: &[BitMap3D; 6],
+) -> [BitMap3D; 6] {
     let mut faces = [[[0; 32]; 32]; 6];
-    // 0 = -x
-    // 1 = +x
-    // 2 = -y
-    // 3 = +y
-    // 4 = -z
-    // 5 = +z
-
-    let [x_aligned, y_aligned, z_aligned] = get_axis_aligned_solid_maps(level, chunk);
-
-    let (px, nx, py, ny, pz, nz) = (
-        get_x_aligned_solid_map(
-            level,
-            ChunkID {
-                lod: chunk.lod,
-                pos: chunk.pos + IVec3::new(1, 0, 0),
-            },
-        ),
-        get_x_aligned_solid_map(
-            level,
-            ChunkID {
-                pos: chunk.pos + IVec3::new(-1, 0, 0),
-                lod: chunk.lod,
-            },
-        ),
-        get_y_aligned_solid_map(
-            level,
-            ChunkID {
-                pos: chunk.pos + IVec3::new(0, 1, 0),
-                lod: chunk.lod,
-            },
-        ),
-        get_y_aligned_solid_map(
-            level,
-            ChunkID {
-                pos: chunk.pos + IVec3::new(0, -1, 0),
-                lod: chunk.lod,
-            },
-        ),
-        get_z_aligned_solid_map(
-            level,
-            ChunkID {
-                pos: chunk.pos + IVec3::new(0, 0, 1),
-                lod: chunk.lod,
-            },
-        ),
-        get_z_aligned_solid_map(
-            level,
-            ChunkID {
-                pos: chunk.pos + IVec3::new(0, 0, -1),
-                lod: chunk.lod,
-            },
-        ),
-    );
     for i in 0..32 {
         for j in 0..32 {
             faces[0][i][j] = x_aligned[i][j] & !((x_aligned[i][j] >> 1) | (nx[i][j] << 31));
@@ -161,55 +98,20 @@ pub fn map_visible(level: &Level, chunk: ChunkID) -> [BitMap3D; 6] {
             faces[5][i][j] = z_aligned[i][j] & !((z_aligned[i][j] << 1) | (pz[i][j] >> 31));
         }
     }
-    /*
-    println!(
-        "\
-    x:  {}\n\
-    -x: {}\n\
-    +x: {}\n\n\
-    y:  {}\n\
-    -y: {}\n\
-    +y: {}\n\n\
-    z:  {}\n\
-    -z: {}\n\
-    +z: {}\n\
-    ",
-        format(x_aligned[0][0]),
-        format(faces[0].0[0][0]),
-        format(faces[1].0[0][0]),
-        format(y_aligned[0][0]),
-        format(faces[2].0[0][0]),
-        format(faces[3].0[0][0]),
-        format(z_aligned[0][0]),
-        format(faces[4].0[0][0]),
-        format(faces[5].0[0][0])
-    );
-
-    fn format(num: u32) -> String {
-        let mut out = String::new();
-        for i in (0..32).rev() {
-            out += match num >> i & 1 {
-                0 => "   ",
-                1 => "|#|",
-                _ => unreachable!(),
-            }
-        }
-        out
-    }
-    */
-    // WARNING! additional step: add non solid blocks back in
     faces
 }
 
 const FIRST_BIT: u32 = 0b1000_0000_0000_0000_0000_0000_0000_0000;
 
-pub fn generate_mesh(chunk: ChunkID, data: VoxelData3D, faces: [BitMap3D; 6]) -> Mesh {
+pub fn generate_mesh(chunk: ChunkID, data: &DenseChunk, faces: [BitMap3D; 6]) -> Mesh {
     let chunk_pos = chunk.pos << 5;
     let mut mesh = Mesh::with_capacity(100);
-    for x in 0..32 {
-        for y in 0..32 {
-            for z in 0..32 {
-                if data[x][y][z] == VoxelType::Air {
+    for x in 0..32_usize {
+        for y in 0..32_usize {
+            for z in 0..32_usize {
+                let voxel = data[coords_to_1d_index(UVec3::new(x as u32, y as u32, z as u32))];
+
+                if voxel == VoxelTypes::Air as u16 {
                     continue;
                 }
 
@@ -217,22 +119,22 @@ pub fn generate_mesh(chunk: ChunkID, data: VoxelData3D, faces: [BitMap3D; 6]) ->
                     (chunk_pos + IVec3::new(x as i32, y as i32, z as i32)) << chunk.lod;
 
                 if faces[0][y][z] & (FIRST_BIT >> x) != 0 {
-                    mesh.add_nx(position, data[x][y][z].texture_id(0), chunk.lod)
+                    mesh.add_nx(position, voxel::texture_id(voxel, 0), chunk.lod)
                 }
                 if faces[1][y][z] & (FIRST_BIT >> x) != 0 {
-                    mesh.add_px(position, data[x][y][z].texture_id(1), chunk.lod)
+                    mesh.add_px(position, voxel::texture_id(voxel, 1), chunk.lod)
                 }
                 if faces[2][z][x] & (FIRST_BIT >> y) != 0 {
-                    mesh.add_ny(position, data[x][y][z].texture_id(2), chunk.lod)
+                    mesh.add_ny(position, voxel::texture_id(voxel, 2), chunk.lod)
                 }
                 if faces[3][z][x] & (FIRST_BIT >> y) != 0 {
-                    mesh.add_py(position, data[x][y][z].texture_id(3), chunk.lod)
+                    mesh.add_py(position, voxel::texture_id(voxel, 3), chunk.lod)
                 }
                 if faces[4][x][y] & (FIRST_BIT >> z) != 0 {
-                    mesh.add_nz(position, data[x][y][z].texture_id(4), chunk.lod)
+                    mesh.add_nz(position, voxel::texture_id(voxel, 4), chunk.lod)
                 }
                 if faces[5][x][y] & (FIRST_BIT >> z) != 0 {
-                    mesh.add_pz(position, data[x][y][z].texture_id(5), chunk.lod)
+                    mesh.add_pz(position, voxel::texture_id(voxel, 5), chunk.lod)
                 }
             }
         }

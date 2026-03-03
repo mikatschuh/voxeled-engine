@@ -12,8 +12,8 @@ use tokio::io;
 use crate::{
     Chunk, ComposableGenerator, Mesh,
     cam_controller::CamController,
-    chunk::BitMap3D,
-    flood_fill::{SphereConfig, SphereGeneratorAllocations},
+    flood_fill::{SphereConfig, SphereGeneratorAllocations, chunk_neighbors},
+    meshing::BitMap3D,
     mpsc,
     task::{self, Task},
     task_submission::TaskSubmitter,
@@ -110,11 +110,16 @@ pub fn create_engine_thread(
             let (collider_tx, collider_submission_queue) =
                 mpsc::new(M_S_PER_TICK / 20 * worker_count);
 
+            let (solid_maps_tx, solid_map_queue) =
+                mpsc::new::<(ChunkID, Box<[BitMap3D; 3]>)>(10_000);
+
             let threadpool = Threadpool::new(worker_count, |_| task::Context {
                 task_queue: working_class_people.add_worker(1000),
                 world_generator: world_generator.clone(),
+
                 chunk_tx: chunk_tx.clone(),
                 collider_tx: collider_tx.clone(),
+                solid_map_tx: solid_maps_tx.clone(),
 
                 meshes: mesh_updates_tx.clone(),
             })?;
@@ -124,10 +129,7 @@ pub fn create_engine_thread(
 
             let mut chunks: HashMap<ChunkID, Chunk> = HashMap::with_capacity(10_000);
 
-            let mut solid_maps: [HashMap<ChunkID, [u32; 32]>; 6] = [
-                HashMap::with_capacity(10_000),
-                HashMap::with_capacity(10_000),
-                HashMap::with_capacity(10_000),
+            let mut solid_maps: [HashMap<ChunkID, BitMap3D>; 3] = [
                 HashMap::with_capacity(10_000),
                 HashMap::with_capacity(10_000),
                 HashMap::with_capacity(10_000),
@@ -153,8 +155,23 @@ pub fn create_engine_thread(
                         &mut sphere_generator_allocations,
                         |chunk| {
                             if submitted_chunks.insert(chunk) && !chunks.contains_key(&chunk) {
-                                working_class_people
-                                    .submit_task(chunk, Task::GenerateChunk { chunk });
+                                let mut axis = 0;
+                                working_class_people.submit_task(
+                                    chunk,
+                                    Task::GenerateChunkAndMesh {
+                                        chunk,
+                                        neighbors: Box::new(chunk_neighbors(chunk).map(
+                                            |neighbor| {
+                                                let solid_map = solid_maps[axis & !1]
+                                                    .get(&neighbor)
+                                                    .unwrap_or(&[[0_u32; 32]; 32])
+                                                    .clone();
+                                                axis += 1;
+                                                solid_map
+                                            },
+                                        )),
+                                    },
+                                );
                             }
                         },
                     );
@@ -164,10 +181,15 @@ pub fn create_engine_thread(
                 while let Ok(submission) = chunk_submission_queue.pop() {
                     chunks.insert(submission.0, submission.1);
                 }
+                while let Ok((chunk, solid_map)) = solid_map_queue.pop() {
+                    solid_maps[0].insert(chunk, solid_map[0]);
+                    solid_maps[1].insert(chunk, solid_map[1]);
+                    solid_maps[2].insert(chunk, solid_map[2]);
+                }
                 {
                     let mut collider = collider.write();
-                    while let Ok(submission) = collider_submission_queue.pop() {
-                        collider.insert(submission.0, *submission.1);
+                    while let Ok((chunk, submission)) = collider_submission_queue.pop() {
+                        collider.insert(chunk, *submission);
                     }
                 }
             }

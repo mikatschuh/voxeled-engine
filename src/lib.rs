@@ -13,6 +13,7 @@ mod engine;
 mod flood_fill;
 pub mod frustum;
 mod mesh;
+mod meshing;
 pub mod mpsc;
 mod random;
 mod task;

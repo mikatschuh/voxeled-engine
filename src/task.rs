@@ -2,7 +2,8 @@ use glam::UVec3;
 
 use crate::{
     Chunk, ChunkID, ComposableGenerator, Generator, Mesh,
-    chunk::{BitMap3D, DenseChunk, idx_to_coord},
+    chunk::{DenseChunk, idx_to_coord},
+    meshing::{BitMap3D, generate_mesh, get_axis_aligned_solid_maps, map_visible},
     mpsc, voxel,
     worker::{RecvTask, Runable},
 };
@@ -12,8 +13,11 @@ pub struct Context {
     pub task_queue: rtrb::Consumer<Task>,
 
     pub world_generator: ComposableGenerator,
+
     pub chunk_tx: mpsc::Sender<(ChunkID, Chunk)>,
     pub collider_tx: mpsc::Sender<(ChunkID, Box<BitMap3D>)>,
+    pub solid_map_tx: mpsc::Sender<(ChunkID, Box<[BitMap3D; 3]>)>,
+
     pub meshes: mpsc::Sender<Mesh>,
 }
 
@@ -25,26 +29,42 @@ impl RecvTask<Task> for Context {
 
 #[derive(Debug)]
 pub enum Task {
-    GenerateChunk { chunk: ChunkID },
+    GenerateChunkAndMesh {
+        chunk: ChunkID,
+        neighbors: Box<[BitMap3D; 6]>,
+    },
 }
 
 impl Runable<Context> for Task {
     fn run(self, context: &mut Context) {
         use Task::*;
         match self {
-            GenerateChunk { chunk } => generate_chunk(context, chunk),
+            GenerateChunkAndMesh { chunk, neighbors } => generate_chunk(context, chunk, neighbors),
         }
     }
 }
 
-pub fn generate_chunk(context: &mut Context, chunk: ChunkID) {
-    let data = Box::new(context.world_generator.generate(chunk));
-    let collider = Box::new(get_z_aligned_collider(&data));
+pub fn generate_chunk(context: &mut Context, chunk: ChunkID, neighbors: Box<[BitMap3D; 6]>) {
+    let data = context.world_generator.generate(chunk);
 
+    let collider = Box::new(get_z_aligned_collider(&data));
     context
         .collider_tx
         .push((chunk, collider))
         .expect("the collider submission queue is full (shouldn't)");
+
+    let solid_maps = Box::new(get_axis_aligned_solid_maps(&data));
+    let mesh = generate_mesh(chunk, &data, map_visible(&solid_maps, &neighbors));
+
+    context
+        .meshes
+        .push(mesh)
+        .expect("the mesh submission queue is full (shouldn't)");
+
+    context
+        .solid_map_tx
+        .push((chunk, solid_maps))
+        .expect("the solid map submission queue is full (shouldn't)");
 
     if chunk.lod == 0 {
         context
