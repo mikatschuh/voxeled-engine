@@ -35,6 +35,8 @@ pub fn block_coord(n: f32) -> i32 {
     n.floor() as i32
 }
 
+pub type MeshReceiver = MpscReceiver<(ChunkID, Mesh)>;
+
 pub use chunk::{Chunk, VoxelType};
 pub use engine::{ChunkID, ConfigUpdates, LodLevel, RenderThreadChannels, create_engine_thread};
 pub use flood_fill::SphereConfig;

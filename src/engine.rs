@@ -74,7 +74,7 @@ pub struct RenderThreadChannels {
     pub config_updates: rtrb::Producer<ConfigUpdates>,
     pub player: Arc<RwLock<CamController>>,
     pub voxel_collider: Arc<RwLock<HashMap<ChunkID, BitMap3D>>>,
-    pub mesh_updates: mpsc::Receiver<Mesh>,
+    pub mesh_updates: mpsc::Receiver<(ChunkID, Mesh)>,
 }
 
 const M_S_PER_TICK: usize = 1_000_000 / 60;
@@ -94,7 +94,7 @@ pub fn create_engine_thread(
     let collider = Arc::new(RwLock::new(HashMap::<ChunkID, BitMap3D>::new()));
     let collider_render = collider.clone();
 
-    let (mesh_updates_tx, mesh_updates_rx) = mpsc::new::<Mesh>(10_000);
+    let (mesh_updates_tx, mesh_updates_rx) = mpsc::new::<(ChunkID, Mesh)>(10_000);
 
     thread::Builder::new()
         .name("engine thread".to_owned())

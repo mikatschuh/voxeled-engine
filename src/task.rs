@@ -18,7 +18,7 @@ pub struct Context {
     pub collider_tx: mpsc::Sender<(ChunkID, Box<BitMap3D>)>,
     pub solid_map_tx: mpsc::Sender<(ChunkID, Box<[BitMap3D; 3]>)>,
 
-    pub meshes: mpsc::Sender<Mesh>,
+    pub meshes: mpsc::Sender<(ChunkID, Mesh)>,
 }
 
 impl RecvTask<Task> for Context {
@@ -58,7 +58,7 @@ pub fn generate_chunk(context: &mut Context, chunk: ChunkID, neighbors: Box<[Bit
 
     context
         .meshes
-        .push(mesh)
+        .push((chunk, mesh))
         .expect("the mesh submission queue is full (shouldn't)");
 
     context
