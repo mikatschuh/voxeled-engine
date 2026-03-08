@@ -25,7 +25,7 @@ impl Instance {
             // instance when the shader starts processing a new instance
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &[wgpu::VertexAttribute {
-                offset: mem::size_of::<Self>() as wgpu::BufferAddress,
+                offset: 0,
                 shader_location: 1,
                 format: wgpu::VertexFormat::Uint32,
             }],
