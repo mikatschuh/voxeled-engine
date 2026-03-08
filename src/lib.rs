@@ -39,7 +39,7 @@ pub type MeshReceiver = MpscReceiver<(ChunkID, Mesh)>;
 
 pub use chunk::{Chunk, VoxelType};
 pub use engine::{ChunkID, ConfigUpdates, LodLevel, RenderThreadChannels, create_engine_thread};
-pub use flood_fill::SphereConfig;
+pub use flood_fill::{SphereConfig, SphereGeneratorAllocations};
 pub use frustum::{Frustum, FrustumAllocations};
 pub use mesh::{Instance, Mesh, TextureID};
 pub use mpsc::{Receiver as MpscReceiver, Sender as MpscSender, new as mpsc_channel};

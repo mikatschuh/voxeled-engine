@@ -4,7 +4,7 @@ use glam::{IVec3, Vec3};
 
 use crate::{ChunkID, engine::LodLevel};
 
-pub const MAX_LOD: LodLevel = 64;
+pub const MAX_LOD: LodLevel = 8;
 
 pub struct SphereConfig {
     pub full_detail_range: f32,
@@ -19,7 +19,7 @@ pub struct SphereGeneratorAllocations {
 }
 
 impl SphereGeneratorAllocations {
-    pub fn new(max_chunks: usize) -> Self {
+    pub fn default(max_chunks: usize) -> Self {
         Self {
             already_queued: HashSet::with_capacity(max_chunks * 2),
             candidates: VecDeque::with_capacity(max_chunks * 2),
@@ -99,19 +99,4 @@ pub fn chunk_neighbors(c: ChunkID) -> [ChunkID; 6] {
 pub fn lod_at_dst(full_detail_range: f32, cam_chunk_pos: Vec3, chunk_coord: Vec3) -> LodLevel {
     let dst = cam_chunk_pos.distance(chunk_coord);
     (dst / full_detail_range).ceil().log2().ceil().min(65535.) as u16
-}
-
-#[allow(unused)]
-pub fn chunk_overlaps(a: &ChunkID, b: ChunkID) -> bool {
-    if a.lod == b.lod {
-        return a.pos == b.pos;
-    }
-
-    if a.lod > b.lod {
-        let shift = (a.lod - b.lod) as i32;
-        return (b.pos >> shift) == a.pos;
-    }
-
-    let shift = (b.lod - a.lod) as i32;
-    (a.pos >> shift) == b.pos
 }

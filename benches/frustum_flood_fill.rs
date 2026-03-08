@@ -1,8 +1,8 @@
-use std::f32::consts::FRAC_PI_3;
+use std::{collections::HashMap, f32::consts::FRAC_PI_3};
 
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use glam::Vec3;
-use voxine::{Frustum, FrustumAllocations};
+use voxine::{ChunkID, Frustum, FrustumAllocations, Mesh};
 
 fn benchmark_flood_fill(c: &mut Criterion) {
     let max_chunks = 5000;
@@ -18,9 +18,11 @@ fn benchmark_flood_fill(c: &mut Criterion) {
         full_detail_range: 12.,
     };
 
+    let ready_meshs: HashMap<ChunkID, Mesh> = HashMap::new();
+
     c.bench_function("frustum_flood_fill", |b| {
         b.iter(|| {
-            let out = black_box(frustum.clone()).flood_fill(&mut allocations);
+            let out = black_box(frustum.clone()).flood_fill(&mut allocations, &ready_meshs);
             black_box(out);
         });
     });

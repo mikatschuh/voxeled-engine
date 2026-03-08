@@ -1,6 +1,9 @@
 use glam::Vec3;
 
-use std::collections::{HashSet, VecDeque};
+use std::{
+    any::Any,
+    collections::{HashMap, HashSet, VecDeque},
+};
 
 use crate::{
     engine::ChunkID,
@@ -24,6 +27,7 @@ pub struct Frustum {
 #[derive(Debug, Clone)]
 pub struct FrustumAllocations {
     pub chunks: Vec<ChunkID>,
+    pub ready_chunks: Vec<ChunkID>,
     pub already_queued: HashSet<ChunkID>,
     pub candidates: VecDeque<ChunkID>,
     pub next_lod_candidates: VecDeque<ChunkID>,
@@ -33,6 +37,7 @@ impl FrustumAllocations {
     pub fn default(max_chunks: usize) -> Self {
         Self {
             chunks: Vec::with_capacity(max_chunks),
+            ready_chunks: Vec::with_capacity(max_chunks),
             already_queued: HashSet::with_capacity(max_chunks * 2),
             candidates: VecDeque::with_capacity(max_chunks * 2),
             next_lod_candidates: VecDeque::with_capacity(max_chunks * 2),
@@ -41,9 +46,13 @@ impl FrustumAllocations {
 }
 
 impl Frustum {
-    pub fn flood_fill(self, buffers: &mut FrustumAllocations) {
+    pub fn flood_fill<'a>(
+        self,
+        buffers: &'a mut FrustumAllocations,
+        ready_meshes: &HashMap<ChunkID, impl Any>,
+    ) -> &'a [ChunkID] {
         if self.max_chunks == 0 {
-            return;
+            return &[];
         }
 
         let cam_pos = self.cam_pos / 32.0;
@@ -65,7 +74,7 @@ impl Frustum {
         let max_distance = self.max_distance.max(0.0);
 
         let in_frustum = |c: ChunkID| -> bool {
-            let size = c.size();
+            let size = (1 << c.lod) as f32;
             let center = c.total_pos().as_vec3() + Vec3::splat(size * 0.5);
             let delta = center - cam_pos;
             let half_extent = size * 0.5;
@@ -92,6 +101,9 @@ impl Frustum {
                 && !outside_plane(top_normal, 0.0)
         };
 
+        buffers.already_queued.clear();
+        buffers.candidates.clear();
+        buffers.next_lod_candidates.clear();
         buffers.chunks.clear();
 
         let base_chunk = ChunkID::from_pos(cam_pos, 0);
@@ -129,8 +141,59 @@ impl Frustum {
                 std::mem::swap(&mut buffers.candidates, &mut buffers.next_lod_candidates);
             }
         }
-        buffers.already_queued.clear();
-        buffers.candidates.clear();
-        buffers.next_lod_candidates.clear();
+        buffers.ready_chunks.clear();
+        select_render_chunks(&buffers.chunks, ready_meshes, &mut buffers.ready_chunks);
+
+        &buffers.ready_chunks
     }
+}
+
+fn select_render_chunks(
+    chunks: &[ChunkID],
+    ready_meshes: &HashMap<ChunkID, impl Any>,
+    ready_chunks: &mut Vec<ChunkID>,
+) {
+    for desired in chunks.iter().copied() {
+        let mut candidate = desired;
+        if !ready_meshes.contains_key(&candidate) {
+            let mut next = candidate;
+            let mut found = false;
+            while next.lod < MAX_LOD {
+                next = next.parent();
+                if ready_meshes.contains_key(&next) {
+                    candidate = next;
+                    found = true;
+                    break;
+                }
+            }
+            if !found && !ready_meshes.contains_key(&candidate) {
+                continue;
+            }
+        }
+
+        ready_chunks.retain(|existing| {
+            !(chunk_overlaps(existing, candidate) && existing.lod < candidate.lod)
+        });
+        if ready_chunks
+            .iter()
+            .any(|existing| chunk_overlaps(existing, candidate) && existing.lod <= candidate.lod)
+        {
+            continue;
+        }
+        ready_chunks.push(candidate);
+    }
+}
+
+pub fn chunk_overlaps(a: &ChunkID, b: ChunkID) -> bool {
+    if a.lod == b.lod {
+        return a.pos == b.pos;
+    }
+
+    if a.lod > b.lod {
+        let shift = (a.lod - b.lod) as i32;
+        return (b.pos >> shift) == a.pos;
+    }
+
+    let shift = (b.lod - a.lod) as i32;
+    (a.pos >> shift) == b.pos
 }

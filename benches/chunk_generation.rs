@@ -1,9 +1,8 @@
-use std::f32::consts::FRAC_PI_3;
-
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use glam::{IVec3, Vec3};
 use voxine::{
-    ComposableGenerator, Frustum, FrustumAllocations, GenBox, Generator, MaterialGenerator,
+    ComposableGenerator, GenBox, Generator, MaterialGenerator, SphereConfig,
+    SphereGeneratorAllocations,
 };
 
 fn benchmark_chunk_generation(c: &mut Criterion) {
@@ -15,24 +14,23 @@ fn benchmark_chunk_generation(c: &mut Criterion) {
         },
         Some(MaterialGenerator::new(seed)),
     );
-    let max_chunks = 5000;
-    let mut allocations = FrustumAllocations::default(max_chunks);
+    let max_chunks = 1_000_000;
+    let mut allocations = SphereGeneratorAllocations::default(max_chunks);
 
-    let frustum = Frustum {
-        cam_pos: Vec3::ZERO,
-        direction: Vec3::new(0.3, 0.7, 0.6).normalize(),
-        fov: FRAC_PI_3,
-        aspect_ratio: 16. / 9.,
-        max_chunks,
-        max_distance: 48.,
+    let mut chunks = vec![];
+    SphereConfig {
         full_detail_range: 12.,
-    };
-    frustum.flood_fill(&mut allocations);
-    let mut chunks = allocations.chunks.into_iter().cycle();
+        radius: 10_000. / 32.,
+        max_chunks: max_chunks,
+    }
+    .flood_fill(Vec3::ZERO, &mut allocations, |c| chunks.push(c));
+    let chunks = chunks.into_iter();
     c.bench_function("ComposableGenerator::generate", |b| {
         b.iter(|| {
-            let out = black_box(generator.clone()).generate(chunks.next().unwrap());
-            black_box(out);
+            for c in black_box(chunks.clone()) {
+                let out = black_box(generator.clone()).generate(c);
+                black_box(out);
+            }
         });
     });
 }

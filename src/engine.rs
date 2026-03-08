@@ -44,10 +44,6 @@ impl ChunkID {
         }
     }
 
-    pub(crate) fn size(self) -> f32 {
-        (1 << self.lod) as f32
-    }
-
     pub fn from_pos(v: Vec3, lod: LodLevel) -> Self {
         Self {
             lod,
@@ -134,7 +130,7 @@ pub fn create_engine_thread(
                 meshes: mesh_updates_tx.clone(),
             })?;
 
-            let mut sphere_generator_allocations = SphereGeneratorAllocations::new(5000);
+            let mut sphere_generator_allocations = SphereGeneratorAllocations::default(5000);
             let mut players_last_pos = None;
 
             let mut chunks: HashMap<ChunkID, Chunk> = HashMap::with_capacity(10_000);
@@ -191,11 +187,13 @@ pub fn create_engine_thread(
                 while let Ok(submission) = chunk_submission_queue.pop() {
                     chunks.insert(submission.0, submission.1);
                 }
+
                 while let Ok((chunk, solid_map)) = solid_map_queue.pop() {
                     solid_maps[0].insert(chunk, solid_map[0]);
                     solid_maps[1].insert(chunk, solid_map[1]);
                     solid_maps[2].insert(chunk, solid_map[2]);
                 }
+
                 {
                     let mut collider = collider.write();
                     while let Ok((chunk, submission)) = collider_submission_queue.pop() {
