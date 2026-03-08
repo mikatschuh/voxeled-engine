@@ -1,7 +1,6 @@
-use glam::{IVec3, UVec3};
+use glam::UVec3;
 
 use crate::{
-    ChunkID,
     chunk::{DenseChunk, coords_to_1d_index, idx_to_coord},
     mesh::Mesh,
     voxel::{self, VoxelTypes},
@@ -55,7 +54,7 @@ pub fn map_visible(
 
 const FIRST_BIT: u32 = 0b1000_0000_0000_0000_0000_0000_0000_0000;
 
-pub fn generate_mesh(chunk: ChunkID, data: &DenseChunk, faces: [BitMap3D; 6]) -> Mesh {
+pub fn generate_mesh(data: &DenseChunk, faces: [BitMap3D; 6]) -> Mesh {
     let mut mesh = Mesh::with_capacity(100);
     for x in 0..32_usize {
         for y in 0..32_usize {
@@ -68,22 +67,22 @@ pub fn generate_mesh(chunk: ChunkID, data: &DenseChunk, faces: [BitMap3D; 6]) ->
                 }
 
                 if faces[0][y][z] & (FIRST_BIT >> x) != 0 {
-                    mesh.add_nx(pos, voxel::texture_id(voxel, 0), chunk.lod)
+                    mesh.add_nx(pos, voxel::texture_id(voxel, 0))
                 }
                 if faces[1][y][z] & (FIRST_BIT >> x) != 0 {
-                    mesh.add_px(pos, voxel::texture_id(voxel, 1), chunk.lod)
+                    mesh.add_px(pos, voxel::texture_id(voxel, 1))
                 }
                 if faces[2][z][x] & (FIRST_BIT >> y) != 0 {
-                    mesh.add_ny(pos, voxel::texture_id(voxel, 2), chunk.lod)
+                    mesh.add_ny(pos, voxel::texture_id(voxel, 2))
                 }
                 if faces[3][z][x] & (FIRST_BIT >> y) != 0 {
-                    mesh.add_py(pos, voxel::texture_id(voxel, 3), chunk.lod)
+                    mesh.add_py(pos, voxel::texture_id(voxel, 3))
                 }
                 if faces[4][x][y] & (FIRST_BIT >> z) != 0 {
-                    mesh.add_nz(pos, voxel::texture_id(voxel, 4), chunk.lod)
+                    mesh.add_nz(pos, voxel::texture_id(voxel, 4))
                 }
                 if faces[5][x][y] & (FIRST_BIT >> z) != 0 {
-                    mesh.add_pz(pos, voxel::texture_id(voxel, 5), chunk.lod)
+                    mesh.add_pz(pos, voxel::texture_id(voxel, 5))
                 }
             }
         }

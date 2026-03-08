@@ -54,7 +54,7 @@ pub fn generate_chunk(context: &mut Context, chunk: ChunkID, neighbors: Box<[Bit
         .expect("the collider submission queue is full (shouldn't)");
 
     let solid_maps = Box::new(get_axis_aligned_solid_maps(&data));
-    let mesh = generate_mesh(chunk, &data, map_visible(&solid_maps, &neighbors));
+    let mesh = generate_mesh(&data, map_visible(&solid_maps, &neighbors));
 
     context
         .meshes
