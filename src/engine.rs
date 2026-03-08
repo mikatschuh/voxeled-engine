@@ -12,7 +12,7 @@ use tokio::io;
 use crate::{
     Chunk, ComposableGenerator, Mesh,
     cam_controller::CamController,
-    flood_fill::{SphereConfig, SphereGeneratorAllocations, chunk_neighbors},
+    flood_fill::{SphereGeneratorAllocations, chunk_neighbors},
     meshing::BitMap3D,
     mpsc,
     task::{self, Task},
@@ -72,8 +72,17 @@ impl From<Vec3> for ChunkID {
 }
 
 pub enum ConfigUpdates {
-    WorldGeneration(SphereConfig),
+    NewConfig(Config),
     ShutDown,
+}
+
+pub struct Config {
+    low_lod_dst: f32,
+    total_generation_distance: f32,
+    max_chunks: usize,
+
+    mesh_queue_cap: usize,
+    chunk_submit_queue_cap: usize,
 }
 
 pub struct RenderThreadChannels {
@@ -87,7 +96,7 @@ const M_S_PER_TICK: usize = 1_000_000 / 60;
 
 pub fn create_engine_thread(
     workers: usize,
-    mut sphere_config: SphereConfig,
+    mut config: Config,
     player: CamController,
     world_generator: ComposableGenerator,
 ) -> Result<RenderThreadChannels, io::Error> {
@@ -146,7 +155,7 @@ pub fn create_engine_thread(
                 while let Ok(config_update) = config_updates_recv.pop() {
                     use ConfigUpdates::*;
                     match config_update {
-                        WorldGeneration(config) => sphere_config = config,
+                        NewConfig(new_config) => config = new_config,
                         ShutDown => break 'tick_loop,
                     }
                 }
@@ -156,9 +165,11 @@ pub fn create_engine_thread(
                 if Some(player_pos) != players_last_pos {
                     players_last_pos = Some(player_pos);
 
-                    sphere_config.flood_fill(
+                    sphere_generator_allocations.flood_fill(
                         player_pos,
-                        &mut sphere_generator_allocations,
+                        config.low_lod_dst,
+                        config.total_generation_distance,
+                        config.max_chunks,
                         |chunk| {
                             if submitted_chunks.insert(chunk) && !chunks.contains_key(&chunk) {
                                 let mut axis = 0;

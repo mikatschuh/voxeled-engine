@@ -6,12 +6,6 @@ use crate::{ChunkID, engine::LodLevel};
 
 pub const MAX_LOD: LodLevel = 8;
 
-pub struct SphereConfig {
-    pub full_detail_range: f32,
-    pub radius: f32, // in chunks (32*32*32)
-    pub max_chunks: usize,
-}
-
 pub struct SphereGeneratorAllocations {
     pub already_queued: HashSet<ChunkID>,
     pub candidates: VecDeque<ChunkID>,
@@ -28,56 +22,58 @@ impl SphereGeneratorAllocations {
     }
 }
 
-impl SphereConfig {
+impl SphereGeneratorAllocations {
     pub fn flood_fill(
-        &self,
+        &mut self,
         center: Vec3,
-        buffers: &mut SphereGeneratorAllocations,
+        lowest_lod_dst: f32,
+        radius: f32,
+        max_chunks: usize,
         mut out: impl FnMut(ChunkID),
     ) {
         let mut chunk_count: usize = 0;
-        if self.max_chunks == 0 {
+        if max_chunks == 0 {
             return;
         }
 
-        buffers.already_queued.clear();
-        buffers.candidates.clear();
+        self.already_queued.clear();
+        self.candidates.clear();
 
         let base_chunk = ChunkID::from_pos(center, 0);
-        buffers.candidates.push_back(base_chunk);
+        self.candidates.push_back(base_chunk);
 
-        while let Some(chunk) = buffers.candidates.pop_front() {
+        while let Some(chunk) = self.candidates.pop_front() {
             if (chunk.total_pos().as_vec3() + 0.5 * (1 << chunk.lod) as f32).distance(center)
-                < self.radius
+                < radius
             {
                 out(chunk);
                 chunk_count += 1;
-                if chunk_count >= self.max_chunks {
+                if chunk_count >= max_chunks {
                     break;
                 }
 
                 for neighbor in chunk_neighbors(chunk) {
-                    if buffers.already_queued.insert(neighbor) {
+                    if self.already_queued.insert(neighbor) {
                         let lod = lod_at_dst(
-                            self.full_detail_range,
+                            lowest_lod_dst,
                             center,
                             (neighbor.total_pos() & !1).as_vec3(),
                         );
                         let parent = neighbor.parent();
                         if lod == chunk.lod {
-                            buffers.candidates.push_back(neighbor);
+                            self.candidates.push_back(neighbor);
                         } else if lod > chunk.lod
                             && lod < MAX_LOD
-                            && buffers.already_queued.insert(parent)
+                            && self.already_queued.insert(parent)
                         {
-                            buffers.next_lod_candidates.push_back(parent);
+                            self.next_lod_candidates.push_back(parent);
                         }
                     }
                 }
             }
 
-            if buffers.candidates.is_empty() {
-                std::mem::swap(&mut buffers.candidates, &mut buffers.next_lod_candidates);
+            if self.candidates.is_empty() {
+                std::mem::swap(&mut self.candidates, &mut self.next_lod_candidates);
             }
         }
     }
