@@ -44,7 +44,7 @@ impl ChunkID {
         }
     }
 
-    pub fn size(self) -> f32 {
+    pub(crate) fn size(self) -> f32 {
         (1 << self.lod) as f32
     }
 
