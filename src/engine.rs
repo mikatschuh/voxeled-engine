@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
     thread,
+    time::Instant,
 };
 
 use glam::{IVec3, Vec3};
@@ -84,6 +85,8 @@ pub struct Config {
     pub chunk_queue_cap: usize,
     pub collider_queue_cap: usize,
     pub solid_map_queue_cap: usize,
+
+    pub print_tps: bool,
 }
 
 pub struct RenderThreadChannels {
@@ -151,6 +154,8 @@ pub fn create_engine_thread(
                 HashMap::with_capacity(10_000),
             ];
 
+            let mut time_window = Instant::now();
+            let mut tick_count = 0_usize;
             'tick_loop: loop {
                 // update configs
                 while let Ok(update) = updates_recv.pop() {
@@ -210,6 +215,15 @@ pub fn create_engine_thread(
                     while let Ok((chunk, submission)) = collider_submission_queue.pop() {
                         collider.insert(chunk, *submission);
                     }
+                }
+
+                // tick measurement
+                tick_count += 1;
+                let time_elapsed = time_window.elapsed().as_secs_f64();
+                if config.print_tps && time_elapsed >= 0.1 {
+                    println!("[INFO] {}t/s", tick_count as f64 / time_elapsed);
+                    tick_count = 0;
+                    time_window = Instant::now();
                 }
             }
             drop(threadpool);
