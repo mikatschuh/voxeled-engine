@@ -24,8 +24,8 @@ pub type LodLevel = u16;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct ChunkID {
-    pub lod: LodLevel,
     pub pos: IVec3,
+    pub lod: LodLevel,
 }
 
 impl ChunkID {
@@ -53,6 +53,16 @@ impl ChunkID {
             lod,
             pos: v.floor().as_ivec3(),
         }
+    }
+
+    pub fn bytes(&self) -> Box<[u8]> {
+        let bytes = [
+            self.pos.x.cast_unsigned(),
+            self.pos.y.cast_unsigned(),
+            self.pos.z.cast_unsigned(),
+            self.lod as u32,
+        ];
+        bytemuck::cast_slice(&bytes).into()
     }
 }
 

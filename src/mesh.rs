@@ -1,4 +1,4 @@
-use glam::{IVec3, UVec3};
+use glam::UVec3;
 
 pub type TextureID = u16;
 
@@ -25,7 +25,7 @@ impl Instance {
             // instance when the shader starts processing a new instance
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &[wgpu::VertexAttribute {
-                offset: mem::size_of::<IVec3>() as wgpu::BufferAddress,
+                offset: mem::size_of::<u32>() as wgpu::BufferAddress,
                 shader_location: 3,
                 format: wgpu::VertexFormat::Uint32,
             }],

@@ -5,8 +5,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::ChunkID;
-
 pub trait RecvTask<T: Runable<Self>>: Sized {
     fn recv_task(&mut self) -> Option<T>;
 }
@@ -20,7 +18,7 @@ pub type WorkerID = usize;
 #[derive(Debug)]
 pub struct Threadpool<T: fmt::Debug + Runable<C>, C: RecvTask<T>> {
     _phantom: PhantomData<(T, C)>,
-    workers: Vec<thread::JoinHandle<()>>,
+    _workers: Vec<thread::JoinHandle<()>>,
 }
 
 impl<T: Runable<C> + fmt::Debug + Send + 'static, C: RecvTask<T> + Send + 'static>
@@ -57,7 +55,7 @@ impl<T: Runable<C> + fmt::Debug + Send + 'static, C: RecvTask<T> + Send + 'stati
 
         Ok(Self {
             _phantom: PhantomData::default(),
-            workers,
+            _workers: workers,
         })
     }
 }
