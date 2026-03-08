@@ -82,6 +82,7 @@ pub struct Config {
 
     pub mesh_queue_cap: usize,
     pub chunk_queue_cap: usize,
+    pub collider_queue_cap: usize,
     pub solid_map_queue_cap: usize,
 }
 
@@ -122,8 +123,7 @@ pub fn create_engine_thread(
                 mpsc::new::<(ChunkID, Chunk)>(config.chunk_queue_cap);
             let mut submitted_chunks: HashSet<ChunkID> = HashSet::with_capacity(10_000);
 
-            let (collider_tx, collider_submission_queue) =
-                mpsc::new(M_S_PER_TICK / 20 * worker_count);
+            let (collider_tx, collider_submission_queue) = mpsc::new(config.collider_queue_cap);
 
             let (solid_maps_tx, solid_map_queue) =
                 mpsc::new::<(ChunkID, Box<[BitMap3D; 3]>)>(config.solid_map_queue_cap);
