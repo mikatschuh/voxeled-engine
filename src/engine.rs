@@ -172,7 +172,7 @@ pub fn create_engine_thread(
                                         chunk,
                                         neighbors: Box::new(chunk_neighbors(chunk).map(
                                             |neighbor| {
-                                                let solid_map = solid_maps[axis & !1]
+                                                let solid_map = solid_maps[axis >> 1]
                                                     .get(&neighbor)
                                                     .unwrap_or(&[[0_u32; 32]; 32])
                                                     .clone();
