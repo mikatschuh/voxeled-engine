@@ -4,7 +4,7 @@ use glam::{IVec3, Vec3};
 
 use crate::{ChunkID, engine::LodLevel};
 
-pub const MAX_LOD: LodLevel = 16;
+pub const MAX_LOD: LodLevel = 64;
 
 pub struct SphereConfig {
     pub full_detail_range: f32,
