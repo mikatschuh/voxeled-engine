@@ -50,7 +50,6 @@ impl Mesh {
         }
     }
 
-    #[allow(unused)]
     pub fn len_in_bytes(&self) -> usize {
         self.buf.len() << 2 // multiply by four
     }

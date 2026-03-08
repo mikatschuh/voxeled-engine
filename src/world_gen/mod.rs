@@ -164,7 +164,7 @@ impl Gen3D {
             let pos = IVec3::new(
                 (coord.x as i32 + chunk.pos.x * 32) << chunk.lod,
                 (coord.y as i32 + chunk.pos.y * 32) << chunk.lod,
-                (coord.y as i32 + chunk.pos.z * 32) << chunk.lod,
+                (coord.z as i32 + chunk.pos.z * 32) << chunk.lod,
             );
 
             let val = self.noise.get_octaves(
@@ -179,6 +179,41 @@ impl Gen3D {
                 continue;
             } else {
                 material(pos)
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use glam::IVec3;
+
+    use crate::ChunkID;
+
+    use super::Gen3D;
+
+    #[test]
+    fn gen3d_uses_z_coordinate_for_world_z() {
+        let chunk = ChunkID::new(0, IVec3::new(0, 0, 0));
+        let mut out = [0_u16; 32 * 32 * 32];
+        let gen3d = Gen3D {
+            noise: crate::Noise::new(1),
+            octaves: 1,
+            x_scale: 1.0,
+            y_scale: 1.0,
+            z_scale: 1.0,
+            exponent: 1.0,
+            threshold: -1.0,
+        };
+
+        gen3d.generate(chunk, &mut out, |pos| pos.z as u16);
+
+        for x in 0..32 {
+            for y in 0..32 {
+                for z in 0..32 {
+                    let idx = x * 32 * 32 + y * 32 + z;
+                    assert_eq!(out[idx], z as u16);
+                }
             }
         }
     }
