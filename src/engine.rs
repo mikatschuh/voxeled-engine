@@ -126,7 +126,7 @@ pub fn create_engine_thread(
                 mpsc::new(M_S_PER_TICK / 20 * worker_count);
 
             let (solid_maps_tx, solid_map_queue) =
-                mpsc::new::<(ChunkID, Box<[BitMap3D; 3]>)>(10_000);
+                mpsc::new::<(ChunkID, Box<[BitMap3D; 3]>)>(config.solid_map_queue_cap);
 
             let threadpool = Threadpool::new(worker_count, |_| task::Context {
                 task_queue: working_class_people.add_worker(100),
