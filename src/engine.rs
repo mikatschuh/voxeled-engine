@@ -71,8 +71,7 @@ impl From<Vec3> for ChunkID {
     }
 }
 
-pub enum ConfigUpdates {
-    NewConfig(Config),
+pub enum Updates {
     ShutDown,
 }
 
@@ -82,11 +81,12 @@ pub struct Config {
     pub max_chunks: usize,
 
     pub mesh_queue_cap: usize,
-    pub chunk_submit_queue_cap: usize,
+    pub chunk_queue_cap: usize,
+    pub solid_map_queue_cap: usize,
 }
 
 pub struct RenderThreadChannels {
-    pub config_updates: rtrb::Producer<ConfigUpdates>,
+    pub updates: rtrb::Producer<Updates>,
     pub player: Arc<RwLock<CamController>>,
     pub voxel_collider: Arc<RwLock<HashMap<ChunkID, BitMap3D>>>,
     pub mesh_updates: mpsc::Receiver<(ChunkID, Mesh)>,
@@ -96,12 +96,12 @@ const M_S_PER_TICK: usize = 1_000_000 / 60;
 
 pub fn create_engine_thread(
     workers: usize,
-    mut config: Config,
+    config: Config,
     player: CamController,
     world_generator: ComposableGenerator,
 ) -> Result<RenderThreadChannels, io::Error> {
     // render thread interface
-    let (config_updates, mut config_updates_recv) = RingBuffer::new(10);
+    let (updates, mut updates_recv) = RingBuffer::new(16);
 
     let player = Arc::new(RwLock::new(player));
     let player_render = player.clone();
@@ -109,7 +109,7 @@ pub fn create_engine_thread(
     let collider = Arc::new(RwLock::new(HashMap::<ChunkID, BitMap3D>::new()));
     let collider_render = collider.clone();
 
-    let (mesh_updates_tx, mesh_updates_rx) = mpsc::new::<(ChunkID, Mesh)>(10_000);
+    let (mesh_updates_tx, mesh_updates_rx) = mpsc::new::<(ChunkID, Mesh)>(config.mesh_queue_cap);
 
     thread::Builder::new()
         .name("engine thread".to_owned())
@@ -119,7 +119,7 @@ pub fn create_engine_thread(
             let mut working_class_people = TaskSubmitter::new();
 
             let (chunk_tx, chunk_submission_queue) =
-                mpsc::new::<(ChunkID, Chunk)>(M_S_PER_TICK / 20 * worker_count);
+                mpsc::new::<(ChunkID, Chunk)>(config.chunk_queue_cap);
             let mut submitted_chunks: HashSet<ChunkID> = HashSet::with_capacity(10_000);
 
             let (collider_tx, collider_submission_queue) =
@@ -129,7 +129,7 @@ pub fn create_engine_thread(
                 mpsc::new::<(ChunkID, Box<[BitMap3D; 3]>)>(10_000);
 
             let threadpool = Threadpool::new(worker_count, |_| task::Context {
-                task_queue: working_class_people.add_worker(1000),
+                task_queue: working_class_people.add_worker(100),
                 world_generator: world_generator.clone(),
 
                 chunk_tx: chunk_tx.clone(),
@@ -139,7 +139,8 @@ pub fn create_engine_thread(
                 meshes: mesh_updates_tx.clone(),
             })?;
 
-            let mut sphere_generator_allocations = SphereGeneratorAllocations::default(5000);
+            let mut sphere_generator_allocations =
+                SphereGeneratorAllocations::default(config.max_chunks);
             let mut players_last_pos = None;
 
             let mut chunks: HashMap<ChunkID, Chunk> = HashMap::with_capacity(10_000);
@@ -152,10 +153,9 @@ pub fn create_engine_thread(
 
             'tick_loop: loop {
                 // update configs
-                while let Ok(config_update) = config_updates_recv.pop() {
-                    use ConfigUpdates::*;
-                    match config_update {
-                        NewConfig(new_config) => config = new_config,
+                while let Ok(update) = updates_recv.pop() {
+                    use Updates::*;
+                    match update {
                         ShutDown => break 'tick_loop,
                     }
                 }
@@ -217,7 +217,7 @@ pub fn create_engine_thread(
         })?;
 
     Ok(RenderThreadChannels {
-        config_updates,
+        updates,
         player: player_render,
         voxel_collider: collider_render,
         mesh_updates: mesh_updates_rx,
