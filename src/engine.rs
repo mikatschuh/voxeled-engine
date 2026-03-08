@@ -77,12 +77,12 @@ pub enum ConfigUpdates {
 }
 
 pub struct Config {
-    low_lod_dst: f32,
-    total_generation_distance: f32,
-    max_chunks: usize,
+    pub low_lod_dst: f32,
+    pub total_generation_distance: f32,
+    pub max_chunks: usize,
 
-    mesh_queue_cap: usize,
-    chunk_submit_queue_cap: usize,
+    pub mesh_queue_cap: usize,
+    pub chunk_submit_queue_cap: usize,
 }
 
 pub struct RenderThreadChannels {

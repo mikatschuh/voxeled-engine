@@ -38,7 +38,9 @@ pub fn block_coord(n: f32) -> i32 {
 pub type MeshReceiver = MpscReceiver<(ChunkID, Mesh)>;
 
 pub use chunk::{Chunk, VoxelType};
-pub use engine::{ChunkID, ConfigUpdates, LodLevel, RenderThreadChannels, create_engine_thread};
+pub use engine::{
+    ChunkID, Config, ConfigUpdates, LodLevel, RenderThreadChannels, create_engine_thread,
+};
 pub use flood_fill::SphereGeneratorAllocations;
 pub use frustum::{Frustum, FrustumAllocations};
 pub use mesh::{Instance, Mesh, TextureID};
