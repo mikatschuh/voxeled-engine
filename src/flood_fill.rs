@@ -4,6 +4,8 @@ use glam::{IVec3, Vec3};
 
 use crate::{ChunkID, engine::LodLevel};
 
+pub const MAX_LOD: LodLevel = 16;
+
 pub struct SphereConfig {
     pub full_detail_range: f32,
     pub radius: f32, // in chunks (32*32*32)
@@ -62,10 +64,13 @@ impl SphereConfig {
                             (neighbor.total_pos() & !1).as_vec3(),
                         );
                         let parent = neighbor.parent();
-                        if lod > chunk.lod && buffers.already_queued.insert(parent) {
-                            buffers.next_lod_candidates.push_back(parent);
-                        } else if lod == chunk.lod {
+                        if lod == chunk.lod {
                             buffers.candidates.push_back(neighbor);
+                        } else if lod > chunk.lod
+                            && lod < MAX_LOD
+                            && buffers.already_queued.insert(parent)
+                        {
+                            buffers.next_lod_candidates.push_back(parent);
                         }
                     }
                 }
@@ -96,6 +101,7 @@ pub fn lod_at_dst(full_detail_range: f32, cam_chunk_pos: Vec3, chunk_coord: Vec3
     (dst / full_detail_range).ceil().log2().ceil().min(65535.) as u16
 }
 
+#[allow(unused)]
 pub fn chunk_overlaps(a: &ChunkID, b: ChunkID) -> bool {
     if a.lod == b.lod {
         return a.pos == b.pos;

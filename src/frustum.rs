@@ -4,7 +4,7 @@ use std::collections::{HashSet, VecDeque};
 
 use crate::{
     engine::ChunkID,
-    flood_fill::{chunk_neighbors, lod_at_dst},
+    flood_fill::{MAX_LOD, chunk_neighbors, lod_at_dst},
 };
 
 /// Chunks are 32^3
@@ -113,10 +113,13 @@ impl Frustum {
                             (neighbor.total_pos() & !1).as_vec3(),
                         );
                         let parent = neighbor.parent();
-                        if lod > chunk.lod && buffers.already_queued.insert(parent) {
-                            buffers.next_lod_candidates.push_back(parent);
-                        } else if lod == chunk.lod {
+                        if lod == chunk.lod {
                             buffers.candidates.push_back(neighbor);
+                        } else if lod > chunk.lod
+                            && lod < MAX_LOD
+                            && buffers.already_queued.insert(parent)
+                        {
+                            buffers.next_lod_candidates.push_back(parent);
                         }
                     }
                 }
