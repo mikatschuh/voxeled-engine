@@ -12,6 +12,9 @@ mod chunk;
 // mod sampling;
 #[allow(dead_code)]
 mod data_structures;
+#[macro_use]
+#[allow(dead_code)]
+mod debug;
 mod engine;
 mod flood_fill;
 mod mesh;

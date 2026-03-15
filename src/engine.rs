@@ -15,7 +15,7 @@ use crate::{
     cam_controller::CamController,
     engine_config::{Config, ConfigUpdate},
     flood_fill::{SphereGeneratorAllocations, chunk_neighbors},
-    meshing::BitMap3D,
+    meshing::{BitMap2D, BitMap3D},
     mpsc,
     task::{self, Task},
     task_submission::TaskSubmitter,
@@ -115,7 +115,7 @@ pub fn engine_thread(
             let (collider_tx, collider_submission_queue) = mpsc::new(config.collider_queue_cap);
 
             let (solid_maps_tx, solid_map_queue) =
-                mpsc::new::<(ChunkID, Box<[BitMap3D; 3]>)>(config.solid_map_queue_cap);
+                mpsc::new::<(ChunkID, Box<[BitMap2D; 6]>)>(config.solid_map_queue_cap);
 
             let threadpool = Threadpool::new(worker_count, |_| task::Context {
                 task_queue: working_class_people.add_worker(100),
@@ -134,11 +134,15 @@ pub fn engine_thread(
 
             let mut chunks: HashMap<ChunkID, Chunk> = HashMap::with_capacity(10_000);
 
-            let mut solid_maps: [HashMap<ChunkID, BitMap3D>; 3] = [
+            let mut solid_maps: [HashMap<ChunkID, BitMap2D>; 6] = [
+                HashMap::with_capacity(10_000),
+                HashMap::with_capacity(10_000),
+                HashMap::with_capacity(10_000),
                 HashMap::with_capacity(10_000),
                 HashMap::with_capacity(10_000),
                 HashMap::with_capacity(10_000),
             ];
+            print_info!("setup complete");
 
             let mut time_window = Instant::now();
             let mut tick_count = 0_usize;
@@ -171,9 +175,9 @@ pub fn engine_thread(
                                         chunk,
                                         neighbors: Box::new(chunk_neighbors(chunk).map(
                                             |neighbor| {
-                                                let solid_map = solid_maps[axis >> 1]
+                                                let solid_map = solid_maps[axis]
                                                     .get(&neighbor)
-                                                    .unwrap_or(&[[0_u32; 32]; 32])
+                                                    .unwrap_or(&[0_u32; 32])
                                                     .clone();
                                                 axis += 1;
                                                 solid_map
@@ -207,13 +211,15 @@ pub fn engine_thread(
                 // tick measurement
                 tick_count += 1;
                 let time_elapsed = time_window.elapsed().as_secs_f64();
-                if config.print_tps && time_elapsed >= 0.1 {
-                    println!("[INFO] {}t/s", tick_count as f64 / time_elapsed);
+                if time_elapsed >= 0.5 {
+                    if config.print_tps {
+                        print_info!("{}t/s", tick_count as f64 / time_elapsed);
+                    }
                     tick_count = 0;
                     time_window = Instant::now();
                 }
             }
-            println!("[INFO] Shutdown");
+            print_info!("SHUTDOWN");
 
             drop(threadpool);
             Ok(())

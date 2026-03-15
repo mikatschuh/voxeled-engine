@@ -3,7 +3,9 @@ use glam::UVec3;
 use crate::{
     Chunk, ChunkID, ComposableGenerator, Generator, Mesh,
     chunk::{DenseChunk, idx_to_coord},
-    meshing::{BitMap3D, generate_mesh, get_axis_aligned_solid_maps, map_visible},
+    meshing::{
+        BitMap2D, BitMap3D, generate_mesh, get_axis_aligned_solid_maps, get_edges, map_visible,
+    },
     mpsc, voxel,
     worker::{RecvTask, Runable},
 };
@@ -16,7 +18,7 @@ pub struct Context {
 
     pub chunk_tx: mpsc::Sender<(ChunkID, Chunk)>,
     pub collider_tx: mpsc::Sender<(ChunkID, Box<BitMap3D>)>,
-    pub solid_map_tx: mpsc::Sender<(ChunkID, Box<[BitMap3D; 3]>)>,
+    pub solid_map_tx: mpsc::Sender<(ChunkID, Box<[BitMap2D; 6]>)>,
 
     pub meshes: mpsc::Sender<(ChunkID, Mesh)>,
 }
@@ -31,7 +33,7 @@ impl RecvTask<Task> for Context {
 pub enum Task {
     GenerateChunkAndMesh {
         chunk: ChunkID,
-        neighbors: Box<[BitMap3D; 6]>,
+        neighbors: Box<[BitMap2D; 6]>,
     },
 }
 
@@ -44,7 +46,7 @@ impl Runable<Context> for Task {
     }
 }
 
-pub fn generate_chunk(context: &mut Context, chunk: ChunkID, neighbors: Box<[BitMap3D; 6]>) {
+pub fn generate_chunk(context: &mut Context, chunk: ChunkID, neighbors: Box<[BitMap2D; 6]>) {
     let data = context.world_generator.generate(chunk);
 
     let collider = Box::new(get_z_aligned_collider(&data));
@@ -63,7 +65,7 @@ pub fn generate_chunk(context: &mut Context, chunk: ChunkID, neighbors: Box<[Bit
 
     context
         .solid_map_tx
-        .push((chunk, solid_maps))
+        .push((chunk, Box::new(get_edges(*solid_maps))))
         .expect("the solid map submission queue is full (shouldn't)");
 
     if chunk.lod == 0 {

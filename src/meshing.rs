@@ -6,6 +6,7 @@ use crate::{
     voxel::{self, VoxelTypes},
 };
 
+pub type BitMap2D = [u32; 32];
 pub type BitMap3D = [[u32; 32]; 32];
 
 pub fn get_axis_aligned_solid_maps(data: &DenseChunk) -> [BitMap3D; 3] {
@@ -28,6 +29,17 @@ pub fn get_axis_aligned_solid_maps(data: &DenseChunk) -> [BitMap3D; 3] {
     [x_aligned, y_aligned, z_aligned]
 }
 
+pub fn get_edges([x_aligned, y_aligned, z_aligned]: [BitMap3D; 3]) -> [BitMap2D; 6] {
+    [
+        z_aligned[0],
+        z_aligned[31],
+        x_aligned[0],
+        x_aligned[31],
+        y_aligned[0],
+        y_aligned[31],
+    ]
+}
+
 /// 0 = -x
 /// 1 = +x
 /// 2 = -y
@@ -36,23 +48,33 @@ pub fn get_axis_aligned_solid_maps(data: &DenseChunk) -> [BitMap3D; 3] {
 /// 5 = +z
 pub fn map_visible(
     [x_aligned, y_aligned, z_aligned]: &[BitMap3D; 3],
-    [nx, px, ny, py, nz, pz]: &[BitMap3D; 6],
+    [nx, px, ny, py, nz, pz]: &[BitMap2D; 6],
 ) -> [BitMap3D; 6] {
-    let mut faces = [[[0; 32]; 32]; 6];
+    let mut faces: [BitMap3D; 6] = [[[0; 32]; 32]; 6];
     for i in 0..32 {
         for j in 0..32 {
-            faces[0][i][j] = x_aligned[i][j] & !((x_aligned[i][j] >> 1) | (nx[i][j] << 31));
-            faces[1][i][j] = x_aligned[i][j] & !((x_aligned[i][j] << 1) | (px[i][j] >> 31));
-            faces[2][i][j] = y_aligned[i][j] & !((y_aligned[i][j] >> 1) | (ny[i][j] << 31));
-            faces[3][i][j] = y_aligned[i][j] & !((y_aligned[i][j] << 1) | (py[i][j] >> 31));
-            faces[4][i][j] = z_aligned[i][j] & !((z_aligned[i][j] >> 1) | (nz[i][j] << 31));
-            faces[5][i][j] = z_aligned[i][j] & !((z_aligned[i][j] << 1) | (pz[i][j] >> 31));
+            faces[0][i][j] =
+                x_aligned[i][j] & !((x_aligned[i][j] >> 1) | ((bit_index(nx[i], j) as u32) << 31));
+            faces[1][i][j] =
+                x_aligned[i][j] & !((x_aligned[i][j] << 1) | bit_index(px[i], j) as u32);
+            faces[2][i][j] =
+                y_aligned[i][j] & !((y_aligned[i][j] >> 1) | ((bit_index(ny[i], j) as u32) << 31));
+            faces[3][i][j] =
+                y_aligned[i][j] & !((y_aligned[i][j] << 1) | (bit_index(py[i], j) as u32));
+            faces[4][i][j] =
+                z_aligned[i][j] & !((z_aligned[i][j] >> 1) | ((bit_index(nz[i], j) as u32) << 31));
+            faces[5][i][j] =
+                z_aligned[i][j] & !((z_aligned[i][j] << 1) | (bit_index(pz[i], j) as u32));
         }
     }
     faces
 }
 
 const FIRST_BIT: u32 = 0b1000_0000_0000_0000_0000_0000_0000_0000;
+#[inline]
+fn bit_index(x: u32, i: usize) -> bool {
+    x & (FIRST_BIT >> i) != 0
+}
 
 pub fn generate_mesh(data: &DenseChunk, faces: [BitMap3D; 6]) -> Mesh {
     let mut mesh = Mesh::with_capacity(100);
@@ -66,22 +88,22 @@ pub fn generate_mesh(data: &DenseChunk, faces: [BitMap3D; 6]) -> Mesh {
                     continue;
                 }
 
-                if faces[0][y][z] & (FIRST_BIT >> x) != 0 {
+                if bit_index(faces[0][y][z], x) {
                     mesh.add_nx(pos, voxel::texture_id(voxel, 0))
                 }
-                if faces[1][y][z] & (FIRST_BIT >> x) != 0 {
+                if bit_index(faces[1][y][z], x) {
                     mesh.add_px(pos, voxel::texture_id(voxel, 1))
                 }
-                if faces[2][z][x] & (FIRST_BIT >> y) != 0 {
+                if bit_index(faces[2][z][x], y) {
                     mesh.add_ny(pos, voxel::texture_id(voxel, 2))
                 }
-                if faces[3][z][x] & (FIRST_BIT >> y) != 0 {
+                if bit_index(faces[3][z][x], y) {
                     mesh.add_py(pos, voxel::texture_id(voxel, 3))
                 }
-                if faces[4][x][y] & (FIRST_BIT >> z) != 0 {
+                if bit_index(faces[4][x][y], z) {
                     mesh.add_nz(pos, voxel::texture_id(voxel, 4))
                 }
-                if faces[5][x][y] & (FIRST_BIT >> z) != 0 {
+                if bit_index(faces[5][x][y], z) {
                     mesh.add_pz(pos, voxel::texture_id(voxel, 5))
                 }
             }
