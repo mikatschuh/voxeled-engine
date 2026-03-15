@@ -1,6 +1,6 @@
 use rtrb::PushError;
 
-use crate::{ChunkID, flood_fill::MAX_LOD, task::Task, worker::WorkerID};
+use crate::{ChunkID, task::Task, worker::WorkerID};
 
 pub struct TaskSubmitter {
     queues: Vec<Vec<rtrb::Producer<Task>>>,
@@ -11,15 +11,15 @@ impl TaskSubmitter {
         Self { queues: vec![] }
     }
 
-    pub fn add_worker(&mut self, cap: usize) -> Vec<rtrb::Consumer<Task>> {
-        let (txs, rxs) = (0..MAX_LOD).map(|_| rtrb::RingBuffer::new(cap)).unzip();
+    pub fn add_worker(&mut self, cap: usize, max_lod: usize) -> Vec<rtrb::Consumer<Task>> {
+        let (txs, rxs) = (0..max_lod).map(|_| rtrb::RingBuffer::new(cap)).unzip();
         self.queues.push(txs);
         rxs
     }
 
     pub fn submit_task(&mut self, chunk: ChunkID, mut task: Task) {
         let bucket = bucket(chunk, self.queues.len());
-        let queue: &mut rtrb::Producer<Task> = &mut self.queues[bucket][chunk.lod as usize];
+        let queue = &mut self.queues[bucket][chunk.lod as usize];
 
         loop {
             match queue.push(task) {

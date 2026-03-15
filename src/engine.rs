@@ -73,6 +73,8 @@ impl From<Vec3> for ChunkID {
     }
 }
 
+const MAX_LOD: usize = 16;
+
 pub enum Update {
     ConfigUpdate { update: ConfigUpdate },
     ShutDown,
@@ -121,7 +123,7 @@ pub fn engine_thread(
                 mpsc::new::<(ChunkID, Box<[BitMap2D; 6]>)>(config.solid_map_queue_cap);
 
             let threadpool = Threadpool::new(worker_count, |_| task::Context {
-                task_queues: working_class_people.add_worker(config.task_queue_cap),
+                task_queues: working_class_people.add_worker(config.task_queue_cap, MAX_LOD),
                 player_pos: player.clone(),
                 full_detail_distance: config.full_detail_distance,
 
@@ -175,7 +177,7 @@ pub fn engine_thread(
                         config.total_generation_distance,
                         config.max_chunks,
                         |chunk| {
-                            if submitted_chunks.insert(chunk) && !chunks.contains_key(&chunk) {
+                            if submitted_chunks.insert(chunk) {
                                 let mut axis = 0;
                                 working_class_people.submit_task(
                                     chunk,

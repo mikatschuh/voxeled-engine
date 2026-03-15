@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     engine::ChunkID,
-    flood_fill::{MAX_LOD, chunk_neighbors, lod_at_dst},
+    flood_fill::{chunk_neighbors, lod_at_dst},
 };
 
 /// Chunks are 32^3
@@ -127,10 +127,7 @@ impl Frustum {
                         let parent = neighbor.parent();
                         if lod == chunk.lod {
                             buffers.candidates.push_back(neighbor);
-                        } else if lod > chunk.lod
-                            && lod < MAX_LOD
-                            && buffers.already_queued.insert(parent)
-                        {
+                        } else if lod > chunk.lod && buffers.already_queued.insert(parent) {
                             buffers.next_lod_candidates.push_back(parent);
                         }
                     }
@@ -158,13 +155,16 @@ fn select_render_chunks(
         if !ready_meshes.contains_key(&candidate) {
             let mut next = candidate;
             let mut found = false;
-            while next.lod < MAX_LOD {
+
+            let mut iterations = 0_usize;
+            while iterations <= 5 {
                 next = next.parent();
                 if ready_meshes.contains_key(&next) {
                     candidate = next;
                     found = true;
                     break;
                 }
+                iterations += 1;
             }
             if !found && !ready_meshes.contains_key(&candidate) {
                 continue;

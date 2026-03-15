@@ -4,10 +4,8 @@ use glam::{IVec3, Vec3};
 
 use crate::{ChunkID, engine::LodLevel};
 
-pub const MAX_LOD: LodLevel = 8;
-
 pub struct SphereGeneratorAllocations {
-    pub already_queued: HashSet<ChunkID>,
+    pub touched: HashSet<ChunkID>,
     pub candidates: VecDeque<ChunkID>,
     pub next_lod_candidates: VecDeque<ChunkID>,
 }
@@ -15,7 +13,7 @@ pub struct SphereGeneratorAllocations {
 impl SphereGeneratorAllocations {
     pub fn default(max_chunks: usize) -> Self {
         Self {
-            already_queued: HashSet::with_capacity(max_chunks * 2),
+            touched: HashSet::with_capacity(max_chunks * 2),
             candidates: VecDeque::with_capacity(max_chunks * 2),
             next_lod_candidates: VecDeque::with_capacity(max_chunks * 2),
         }
@@ -36,7 +34,7 @@ impl SphereGeneratorAllocations {
             return;
         }
 
-        self.already_queued.clear();
+        self.touched.clear();
         self.candidates.clear();
 
         let base_chunk = ChunkID::from_pos(center, 0);
@@ -53,7 +51,7 @@ impl SphereGeneratorAllocations {
                 }
 
                 for neighbor in chunk_neighbors(chunk) {
-                    if self.already_queued.insert(neighbor) {
+                    if self.touched.insert(neighbor) {
                         let lod = lod_at_dst(
                             lowest_lod_dst,
                             center,
@@ -62,10 +60,7 @@ impl SphereGeneratorAllocations {
                         let parent = neighbor.parent();
                         if lod == chunk.lod {
                             self.candidates.push_back(neighbor);
-                        } else if lod > chunk.lod
-                            && lod < MAX_LOD
-                            && self.already_queued.insert(parent)
-                        {
+                        } else if lod > chunk.lod && self.touched.insert(parent) {
                             self.next_lod_candidates.push_back(parent);
                         }
                     }
