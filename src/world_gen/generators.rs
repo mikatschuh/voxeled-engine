@@ -1,15 +1,15 @@
-use std::ops::Add;
+use std::ops::Mul;
+
+use glam::IVec3;
 
 use super::{Layer, ShapeGenerator};
 use crate::{
-    ComposableGenerator, Gen2D, Gen3D, GenBox,
-    random::Noise,
-    world_gen::{MaterialGenerator, Seed},
+    ComposableGenerator, Gen2D, Gen3D, GenBox, random::Noise, voxel::VoxelTypes, world_gen::Seed,
 };
 
-impl Add for ComposableGenerator {
+impl Mul for ComposableGenerator {
     type Output = Self;
-    fn add(mut self, mut rhs: Self) -> Self::Output {
+    fn mul(mut self, mut rhs: Self) -> Self::Output {
         self.gen_stack.append(&mut rhs.gen_stack);
 
         self
@@ -17,7 +17,7 @@ impl Add for ComposableGenerator {
 }
 
 impl ComposableGenerator {
-    pub fn gen_3d(gen3d: Gen3D, material: Option<MaterialGenerator>) -> Self {
+    pub fn gen_3d(gen3d: Gen3D, material: VoxelTypes) -> Self {
         Self {
             gen_stack: vec![Layer {
                 generator: ShapeGenerator::Gen3D(gen3d),
@@ -26,7 +26,7 @@ impl ComposableGenerator {
         }
     }
 
-    pub fn gen_2d(gen2d: Gen2D, material: Option<MaterialGenerator>) -> Self {
+    pub fn gen_2d(gen2d: Gen2D, material: VoxelTypes) -> Self {
         Self {
             gen_stack: vec![Layer {
                 generator: ShapeGenerator::Gen2D(gen2d),
@@ -35,29 +35,72 @@ impl ComposableGenerator {
         }
     }
 
-    pub fn gen_box(box_gen: GenBox, material: Option<MaterialGenerator>) -> Self {
+    pub fn gen_box(min: IVec3, max: IVec3, material: VoxelTypes) -> Self {
         Self {
             gen_stack: vec![Layer {
-                generator: ShapeGenerator::Box(box_gen),
+                generator: ShapeGenerator::Box(GenBox {
+                    invert: true,
+                    min,
+                    max,
+                }),
                 material,
             }],
         }
     }
 
-    pub fn mountains_and_valleys(seed: Seed) -> Self {
+    pub fn gen_cube(min: IVec3, max: IVec3, material: VoxelTypes) -> Self {
         Self {
             gen_stack: vec![Layer {
-                generator: ShapeGenerator::Gen2D(Gen2D {
+                generator: ShapeGenerator::Box(GenBox {
+                    invert: false,
+                    min,
+                    max,
+                }),
+                material,
+            }],
+        }
+    }
+
+    pub fn full(material: VoxelTypes) -> Self {
+        Self {
+            gen_stack: vec![Layer {
+                generator: ShapeGenerator::Full,
+                material: material,
+            }],
+        }
+    }
+
+    pub fn dirt(seed: Seed) -> Self {
+        Self::full(VoxelTypes::Dirt0)
+            * Self::gen_3d(
+                Gen3D {
+                    noise: Noise::new(seed as u32),
+                    octaves: 2,
+                    x_scale: 30.,
+                    y_scale: 30.,
+                    z_scale: 30.,
+                    exponent: 1.,
+                    threshold: 0.5,
+                },
+                VoxelTypes::Dirt1,
+            )
+    }
+
+    pub fn mountains_and_valleys(seed: Seed) -> Self {
+        Self::dirt(seed)
+            * Self::gen_2d(
+                Gen2D {
+                    invert: true,
+
                     noise: Noise::new(seed as u32),
                     x_scale: 20.0,
                     z_scale: 20.0,
                     y_scale: 1200.0,
                     base_height: 0.,
                     octaves: 3,
-                }),
-                material: Some(MaterialGenerator::new(seed)),
-            }],
-        }
+                },
+                VoxelTypes::Air,
+            )
     }
 
     pub fn rain_drops(seed: Seed) -> Self {
@@ -72,7 +115,7 @@ impl ComposableGenerator {
                     exponent: 1.,
                     threshold: 0.8,
                 }),
-                material: Some(MaterialGenerator::new(seed)),
+                material: VoxelTypes::Stone,
             }],
         }
     }
@@ -89,7 +132,7 @@ impl ComposableGenerator {
                     threshold: 0.5,
                     octaves: 9,
                 }),
-                material: Some(MaterialGenerator::new(seed)),
+                material: VoxelTypes::Stone,
             }],
         }
     }

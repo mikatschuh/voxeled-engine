@@ -6,11 +6,8 @@ pub enum VoxelTypes {
     Air = 1,
     CrackedStone,
     Stone,
-    Dirt,
-}
-
-pub fn is_physically_solid(voxel: VoxelType) -> bool {
-    voxel != VoxelTypes::Air as u16
+    Dirt0,
+    Dirt1,
 }
 
 pub fn is_physically_solid_u32(voxel: VoxelType) -> u32 {

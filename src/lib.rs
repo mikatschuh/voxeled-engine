@@ -50,6 +50,5 @@ pub use mesh::{Instance, Mesh, TextureID};
 pub use mpsc::{Receiver as MpscReceiver, Sender as MpscSender, new as mpsc_channel};
 pub use random::Noise;
 pub use time::{DeltaTime, DeltaTimeMeter};
-pub use world_gen::{
-    ComposableGenerator, Gen2D, Gen3D, GenBox, Generator, MaterialGenerator, Seed,
-};
+pub use voxel::VoxelTypes;
+pub use world_gen::{ComposableGenerator, Gen2D, Gen3D, GenBox, Generator, Seed};
