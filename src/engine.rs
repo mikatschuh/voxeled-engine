@@ -110,7 +110,10 @@ pub fn engine_thread(
 
             let (chunk_tx, chunk_submission_queue) =
                 mpsc::new::<(ChunkID, Chunk)>(config.chunk_queue_cap);
+
             let mut submitted_chunks: HashSet<ChunkID> = HashSet::with_capacity(10_000);
+            let (discarded_tasks_tx, discarded_tasks_queue) =
+                mpsc::new(config.discarded_tasks_queue_cap);
 
             let (collider_tx, collider_submission_queue) = mpsc::new(config.collider_queue_cap);
 
@@ -118,8 +121,13 @@ pub fn engine_thread(
                 mpsc::new::<(ChunkID, Box<[BitMap2D; 6]>)>(config.solid_map_queue_cap);
 
             let threadpool = Threadpool::new(worker_count, |_| task::Context {
-                task_queue: working_class_people.add_worker(config.task_queue_cap),
+                task_queues: working_class_people.add_worker(config.task_queue_cap),
+                player_pos: player.clone(),
+                full_detail_distance: config.full_detail_distance,
+
                 world_generator: world_generator.clone(),
+
+                discarded_tasks: discarded_tasks_tx.clone(),
 
                 chunk_tx: chunk_tx.clone(),
                 collider_tx: collider_tx.clone(),
@@ -192,7 +200,7 @@ pub fn engine_thread(
 
                 // process thread pool output
                 while let Ok(submission) = chunk_submission_queue.pop() {
-                    // chunks.insert(submission.0, submission.1);
+                    chunks.insert(submission.0, submission.1);
                 }
 
                 while let Ok((chunk, solid_map)) = solid_map_queue.pop() {
@@ -207,18 +215,22 @@ pub fn engine_thread(
                 {
                     let mut collider = collider.write();
                     while let Ok((chunk, submission)) = collider_submission_queue.pop() {
-                        // collider.insert(chunk, *submission);
+                        collider.insert(chunk, *submission);
                     }
                 }
-                //
+
+                while let Ok(chunk) = discarded_tasks_queue.pop() {
+                    submitted_chunks.remove(&chunk);
+                }
+
                 // tick measurement
                 tick_count += 1;
                 let time_elapsed = time_window.elapsed().as_secs_f64();
                 if time_elapsed >= 1. {
                     if config.print_tps {
                         print_info!(
-                            "tps: {}\tqueued-tasks: {}",
-                            tick_count as f64 / time_elapsed,
+                            "tps  {}\tqueued-tasks  {}",
+                            (tick_count as f64 / time_elapsed).round() as usize,
                             working_class_people.len()
                         );
                     }

@@ -1,9 +1,9 @@
 use rtrb::PushError;
 
-use crate::{ChunkID, task::Task, worker::WorkerID};
+use crate::{ChunkID, flood_fill::MAX_LOD, task::Task, worker::WorkerID};
 
 pub struct TaskSubmitter {
-    queues: Vec<rtrb::Producer<Task>>,
+    queues: Vec<Vec<rtrb::Producer<Task>>>,
 }
 
 impl TaskSubmitter {
@@ -11,15 +11,15 @@ impl TaskSubmitter {
         Self { queues: vec![] }
     }
 
-    pub fn add_worker(&mut self, cap: usize) -> rtrb::Consumer<Task> {
-        let (tx, rx) = rtrb::RingBuffer::new(cap);
-        self.queues.push(tx);
-        rx
+    pub fn add_worker(&mut self, cap: usize) -> Vec<rtrb::Consumer<Task>> {
+        let (txs, rxs) = (0..MAX_LOD).map(|_| rtrb::RingBuffer::new(cap)).unzip();
+        self.queues.push(txs);
+        rxs
     }
 
     pub fn submit_task(&mut self, chunk: ChunkID, mut task: Task) {
         let bucket = bucket(chunk, self.queues.len());
-        let queue = &mut self.queues[bucket];
+        let queue: &mut rtrb::Producer<Task> = &mut self.queues[bucket][chunk.lod as usize];
 
         loop {
             match queue.push(task) {
@@ -33,6 +33,7 @@ impl TaskSubmitter {
     pub fn len(&self) -> usize {
         self.queues
             .iter()
+            .flat_map(|queue| queue.iter())
             .map(|b| b.buffer().capacity() - b.slots())
             .sum()
     }

@@ -1,8 +1,13 @@
+use std::sync::Arc;
+
 use glam::UVec3;
+use parking_lot::RwLock;
 
 use crate::{
     Chunk, ChunkID, ComposableGenerator, Generator, Mesh,
+    cam_controller::CamController,
     chunk::{DenseChunk, idx_to_coord},
+    flood_fill::lod_at_dst,
     meshing::{
         BitMap2D, BitMap3D, generate_mesh, get_axis_aligned_solid_maps, get_edges, map_visible,
     },
@@ -12,9 +17,13 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Context {
-    pub task_queue: rtrb::Consumer<Task>,
+    pub task_queues: Vec<rtrb::Consumer<Task>>,
+    pub player_pos: Arc<RwLock<CamController>>,
+    pub full_detail_distance: f32,
 
     pub world_generator: ComposableGenerator,
+
+    pub discarded_tasks: mpsc::Sender<ChunkID>,
 
     pub chunk_tx: mpsc::Sender<(ChunkID, Chunk)>,
     pub collider_tx: mpsc::Sender<(ChunkID, Box<BitMap3D>)>,
@@ -25,7 +34,12 @@ pub struct Context {
 
 impl RecvTask<Task> for Context {
     fn recv_task(&mut self) -> Option<Task> {
-        self.task_queue.pop().ok()
+        for task_queue in &mut self.task_queues {
+            if let Ok(task) = task_queue.pop() {
+                return Some(task);
+            }
+        }
+        None
     }
 }
 
@@ -41,38 +55,48 @@ impl Runable<Context> for Task {
     fn run(self, context: &mut Context) {
         use Task::*;
         match self {
-            GenerateChunkAndMesh { chunk, neighbors } => generate_chunk(context, chunk, neighbors),
+            GenerateChunkAndMesh { chunk, neighbors } => context.generate_chunk(chunk, neighbors),
         }
     }
 }
 
-pub fn generate_chunk(context: &mut Context, chunk: ChunkID, neighbors: Box<[BitMap2D; 6]>) {
-    let data = context.world_generator.generate(chunk);
+impl Context {
+    pub fn generate_chunk(&mut self, chunk: ChunkID, neighbors: Box<[BitMap2D; 6]>) {
+        if lod_at_dst(
+            self.full_detail_distance,
+            self.player_pos.read().pos() / 32.,
+            chunk.total_pos().as_vec3(),
+        ) > chunk.lod + 1
+        {
+            self.discarded_tasks
+                .push(chunk)
+                .expect("the discarded task submission queue is full (shouldn't)");
+            return;
+        }
 
-    let collider = Box::new(get_z_aligned_collider(&data));
-    context
-        .collider_tx
-        .push((chunk, collider))
-        .expect("the collider submission queue is full (shouldn't)");
+        let data = self.world_generator.generate(chunk);
 
-    let solid_maps = Box::new(get_axis_aligned_solid_maps(&data));
-    let mesh = generate_mesh(&data, map_visible(&solid_maps, &neighbors));
+        let collider = Box::new(get_z_aligned_collider(&data));
+        self.collider_tx
+            .push((chunk, collider))
+            .expect("the collider submission queue is full (shouldn't)");
 
-    context
-        .meshes
-        .push((chunk, mesh))
-        .expect("the mesh submission queue is full (shouldn't)");
+        let solid_maps = Box::new(get_axis_aligned_solid_maps(&data));
+        let mesh = generate_mesh(&data, map_visible(&solid_maps, &neighbors));
 
-    context
-        .solid_map_tx
-        .push((chunk, Box::new(get_edges(*solid_maps))))
-        .expect("the solid map submission queue is full (shouldn't)");
+        self.meshes
+            .push((chunk, mesh))
+            .expect("the mesh submission queue is full (shouldn't)");
 
-    if chunk.lod == 0 {
-        context
-            .chunk_tx
-            .push((chunk, Chunk::from_buffer(&data)))
-            .expect("the chunk submission queue is full (shouldn't)");
+        self.solid_map_tx
+            .push((chunk, Box::new(get_edges(*solid_maps))))
+            .expect("the solid map submission queue is full (shouldn't)");
+
+        if chunk.lod == 0 {
+            self.chunk_tx
+                .push((chunk, Chunk::from_buffer(&data)))
+                .expect("the chunk submission queue is full (shouldn't)");
+        }
     }
 }
 

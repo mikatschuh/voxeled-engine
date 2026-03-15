@@ -1,5 +1,6 @@
 use glam::Vec3;
 
+#[derive(Debug, Clone)]
 pub struct TCBody {
     prev_pos: Vec3,
     prev_time: f32,
@@ -33,6 +34,7 @@ impl TCBody {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Body {
     prev_pos: Vec3,
     pos: Vec3,

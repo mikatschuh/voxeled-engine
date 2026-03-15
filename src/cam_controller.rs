@@ -19,6 +19,7 @@ pub struct CameraConfig {
     sensitivity: f32,
 }
 
+#[derive(Debug, Clone)]
 pub struct CamController {
     body: TCBody,
     pending_acc: Vec3,

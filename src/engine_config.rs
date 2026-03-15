@@ -12,6 +12,8 @@ pub struct Config {
 
     pub task_queue_cap: usize,
 
+    pub discarded_tasks_queue_cap: usize,
+
     pub mesh_queue_cap: usize,
     pub chunk_queue_cap: usize,
     pub collider_queue_cap: usize,
