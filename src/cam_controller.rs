@@ -109,6 +109,10 @@ impl CamController {
         println!("new speed: {}", self.speed);
     }
 
+    pub fn update_config(&mut self, config: CameraConfig) {
+        self.config = config
+    }
+
     pub fn toggle_free_cam(&mut self) {
         self.free_cam = !self.free_cam
     }

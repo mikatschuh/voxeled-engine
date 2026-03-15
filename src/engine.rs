@@ -73,13 +73,13 @@ impl From<Vec3> for ChunkID {
     }
 }
 
-pub enum Updates {
+pub enum Update {
     ConfigUpdate { update: ConfigUpdate },
     ShutDown,
 }
 
 pub struct RenderThreadChannels {
-    pub updates: rtrb::Producer<Updates>,
+    pub updates: rtrb::Producer<Update>,
     pub player: Arc<RwLock<CamController>>,
     pub voxel_collider: Arc<RwLock<HashMap<ChunkID, BitMap3D>>>,
     pub mesh_updates: mpsc::Receiver<(ChunkID, Mesh)>,
@@ -145,7 +145,7 @@ pub fn engine_thread(
             'tick_loop: loop {
                 // update configs
                 while let Ok(update) = updates_recv.pop() {
-                    use Updates::*;
+                    use Update::*;
                     match update {
                         ConfigUpdate { update } => config.update(update),
                         ShutDown => break 'tick_loop,
