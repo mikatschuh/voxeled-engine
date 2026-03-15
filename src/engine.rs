@@ -146,6 +146,7 @@ pub fn engine_thread(
 
             let mut time_window = Instant::now();
             let mut tick_count = 0_usize;
+            let mut num_of_queue_pops = 0_usize;
             'tick_loop: loop {
                 // update configs
                 while let Ok(update) = updates_recv.pop() {
@@ -193,18 +194,24 @@ pub fn engine_thread(
                 // process thread pool output
                 while let Ok(submission) = chunk_submission_queue.pop() {
                     chunks.insert(submission.0, submission.1);
+
+                    num_of_queue_pops += 1;
                 }
 
                 while let Ok((chunk, solid_map)) = solid_map_queue.pop() {
                     solid_maps[0].insert(chunk, solid_map[0]);
                     solid_maps[1].insert(chunk, solid_map[1]);
                     solid_maps[2].insert(chunk, solid_map[2]);
+
+                    num_of_queue_pops += 1;
                 }
 
                 {
                     let mut collider = collider.write();
                     while let Ok((chunk, submission)) = collider_submission_queue.pop() {
                         collider.insert(chunk, *submission);
+
+                        num_of_queue_pops += 1;
                     }
                 }
 
@@ -213,7 +220,11 @@ pub fn engine_thread(
                 let time_elapsed = time_window.elapsed().as_secs_f64();
                 if time_elapsed >= 0.5 {
                     if config.print_tps {
-                        print_info!("{}t/s", tick_count as f64 / time_elapsed);
+                        print_info!(
+                            "{}t/s\t\tqueue-pos = {}",
+                            tick_count as f64 / time_elapsed,
+                            num_of_queue_pops
+                        );
                     }
                     tick_count = 0;
                     time_window = Instant::now();
