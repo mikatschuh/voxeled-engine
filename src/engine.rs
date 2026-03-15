@@ -218,10 +218,10 @@ pub fn engine_thread(
                 // tick measurement
                 tick_count += 1;
                 let time_elapsed = time_window.elapsed().as_secs_f64();
-                if time_elapsed >= 0.5 {
+                if time_elapsed >= 0.1 {
                     if config.print_tps {
                         print_info!(
-                            "{}t/s\t\tqueue-pos = {}",
+                            "{}t/s\t\tqueue-pops = {}",
                             tick_count as f64 / time_elapsed,
                             num_of_queue_pops
                         );
