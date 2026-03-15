@@ -202,6 +202,9 @@ pub fn engine_thread(
                     solid_maps[0].insert(chunk, solid_map[0]);
                     solid_maps[1].insert(chunk, solid_map[1]);
                     solid_maps[2].insert(chunk, solid_map[2]);
+                    solid_maps[3].insert(chunk, solid_map[3]);
+                    solid_maps[4].insert(chunk, solid_map[4]);
+                    solid_maps[5].insert(chunk, solid_map[5]);
 
                     num_of_queue_pops += 1;
                 }
