@@ -13,6 +13,7 @@ use tokio::io;
 use crate::{
     Chunk, ComposableGenerator, Mesh,
     cam_controller::CamController,
+    engine_config::{Config, ConfigUpdate},
     flood_fill::{SphereGeneratorAllocations, chunk_neighbors},
     meshing::BitMap3D,
     mpsc,
@@ -73,20 +74,8 @@ impl From<Vec3> for ChunkID {
 }
 
 pub enum Updates {
+    ConfigUpdate { update: ConfigUpdate },
     ShutDown,
-}
-
-pub struct Config {
-    pub low_lod_dst: f32,
-    pub total_generation_distance: f32,
-    pub max_chunks: usize,
-
-    pub mesh_queue_cap: usize,
-    pub chunk_queue_cap: usize,
-    pub collider_queue_cap: usize,
-    pub solid_map_queue_cap: usize,
-
-    pub print_tps: bool,
 }
 
 pub struct RenderThreadChannels {
@@ -96,11 +85,8 @@ pub struct RenderThreadChannels {
     pub mesh_updates: mpsc::Receiver<(ChunkID, Mesh)>,
 }
 
-const M_S_PER_TICK: usize = 1_000_000 / 60;
-
-pub fn create_engine_thread(
-    workers: usize,
-    config: Config,
+pub fn engine_thread(
+    mut config: Config,
     player: CamController,
     world_generator: ComposableGenerator,
 ) -> Result<RenderThreadChannels, io::Error> {
@@ -118,7 +104,7 @@ pub fn create_engine_thread(
     thread::Builder::new()
         .name("engine thread".to_owned())
         .spawn(move || -> Result<(), io::Error> {
-            let worker_count = (num_cpus::get() - 2).min(workers).max(1); // minus main + engine thread
+            let worker_count = (num_cpus::get() - 2).min(config.worker_count).max(1); // minus main + engine thread
 
             let mut working_class_people = TaskSubmitter::new();
 
@@ -161,6 +147,7 @@ pub fn create_engine_thread(
                 while let Ok(update) = updates_recv.pop() {
                     use Updates::*;
                     match update {
+                        ConfigUpdate { update } => config.update(update),
                         ShutDown => break 'tick_loop,
                     }
                 }
@@ -172,7 +159,7 @@ pub fn create_engine_thread(
 
                     sphere_generator_allocations.flood_fill(
                         player_pos,
-                        config.low_lod_dst,
+                        config.full_detail_distance,
                         config.total_generation_distance,
                         config.max_chunks,
                         |chunk| {
@@ -226,6 +213,8 @@ pub fn create_engine_thread(
                     time_window = Instant::now();
                 }
             }
+            println!("[INFO] Shutdown");
+
             drop(threadpool);
             Ok(())
         })?;

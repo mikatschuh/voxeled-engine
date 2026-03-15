@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 
+[features]
+default = ["renderer"]
+renderer = []
+
 [dependencies]
 glam = "0.23"
 parking_lot = "*"
@@ -17,6 +21,10 @@ bytemuck = { version = "1.16", features = ["derive"] }
 wgpu = "25.0"
 colored = "2.0"
 rtrb = "*"
+notify = "6"
+toml = "0.8"
+serde = { version = "1", features = ["derive"] }
+blake3 = "1"
 
 [dev-dependencies]
 criterion = "0.4"

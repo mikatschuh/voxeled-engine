@@ -1,4 +1,5 @@
 use glam::Vec3;
+use serde::{Deserialize, Serialize};
 
 use crate::{DeltaTime, physics::TCBody};
 
@@ -6,6 +7,15 @@ pub fn dir_from_angle(yaw: f32, pitch: f32) -> Vec3 {
     let (sin_pitch, cos_pitch) = pitch.sin_cos();
     let (sin_yaw, cos_yaw) = yaw.sin_cos();
     Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize()
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct CameraConfig {
+    friction: f32,
+    standart_speed: f32,
+    max_speed: f32,
+    acc_change_sensitivity: f32,
+    sensitivity: f32,
 }
 
 pub struct CamController {
@@ -21,16 +31,18 @@ pub struct CamController {
     dir: Vec3,
 
     delta_time: DeltaTime,
+    config: CameraConfig,
 }
 
 impl CamController {
-    const FRICTION: f32 = 1.0;
-    const STANDART_SPEED: f32 = 20.0;
-    const MAX_SPEED: f32 = 100.0;
-    const ACC_CHANGE_SENSITIVITY: f32 = 3.0;
-    const SENSITIVITY: f32 = 0.0025;
-
-    pub fn new(pos: Vec3, yaw: f32, pitch: f32, free_cam: bool, delta_time: DeltaTime) -> Self {
+    pub fn new(
+        pos: Vec3,
+        yaw: f32,
+        pitch: f32,
+        free_cam: bool,
+        delta_time: DeltaTime,
+        config: CameraConfig,
+    ) -> Self {
         let dir = dir_from_angle(yaw, pitch);
 
         Self {
@@ -38,20 +50,21 @@ impl CamController {
             pending_acc: Vec3::ZERO,
 
             free_cam,
-            speed: Self::STANDART_SPEED,
+            speed: config.standart_speed,
 
             dir,
             yaw,
             pitch,
 
             delta_time,
+            config,
         }
     }
 
     /// Dreht die Kamera um einen Winkel multipliziert mit der Kamera Sensitivität.
     pub fn rotate_around_angle(&mut self, yaw: f32, pitch: f32) {
-        self.yaw += yaw * Self::SENSITIVITY;
-        self.pitch += pitch * Self::SENSITIVITY;
+        self.yaw += yaw * self.config.sensitivity;
+        self.pitch += pitch * self.config.sensitivity;
 
         self.dir = dir_from_angle(self.yaw, self.pitch);
         // self.rot = Quat::from_rotation_y(yaw) * Quat::from_rotation_z(pitch);
@@ -75,7 +88,7 @@ impl CamController {
 
     /// Takes a function which takes the current and the next position and returns the resolved position.
     pub fn advance_pos(&mut self, contrain: impl FnMut(Vec3, Vec3) -> Vec3) {
-        self.body.step(self.delta_time(), Self::FRICTION);
+        self.body.step(self.delta_time(), self.config.friction);
 
         let dt = self.delta_time();
 
@@ -86,11 +99,11 @@ impl CamController {
     }
 
     pub fn update_speed(&mut self, change: f32) {
-        self.speed *= (Self::ACC_CHANGE_SENSITIVITY * change).exp();
+        self.speed *= (self.config.acc_change_sensitivity * change).exp();
 
         self.speed = self.speed.clamp(
-            Self::STANDART_SPEED / Self::MAX_SPEED,
-            Self::STANDART_SPEED * Self::MAX_SPEED,
+            self.config.standart_speed / self.config.max_speed,
+            self.config.standart_speed * self.config.max_speed,
         );
 
         println!("new speed: {}", self.speed);
