@@ -191,6 +191,8 @@ pub fn engine_thread(
                     );
                 }
 
+                dbg!();
+
                 // process thread pool output
                 while let Ok(submission) = chunk_submission_queue.pop() {
                     chunks.insert(submission.0, submission.1);
@@ -218,11 +220,14 @@ pub fn engine_thread(
                     }
                 }
 
+                dbg!();
                 // tick measurement
                 tick_count += 1;
                 let time_elapsed = time_window.elapsed().as_secs_f64();
                 if time_elapsed >= 0.1 {
+                    dbg!();
                     if config.print_tps {
+                        dbg!();
                         print_info!(
                             "{}t/s\t\tqueue-pops = {}",
                             tick_count as f64 / time_elapsed,
