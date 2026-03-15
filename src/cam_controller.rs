@@ -9,7 +9,7 @@ pub fn dir_from_angle(yaw: f32, pitch: f32) -> Vec3 {
     Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize()
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CameraConfig {
     friction: f32,
     standart_speed: f32,
