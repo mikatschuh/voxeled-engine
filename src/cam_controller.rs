@@ -10,6 +10,7 @@ pub fn dir_from_angle(yaw: f32, pitch: f32) -> Vec3 {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct CameraConfig {
     friction: f32,
     standart_speed: f32,
