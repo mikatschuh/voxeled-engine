@@ -29,6 +29,13 @@ impl TaskSubmitter {
             std::hint::spin_loop();
         }
     }
+
+    pub fn len(&self) -> usize {
+        self.queues
+            .iter()
+            .map(|b| b.buffer().capacity() - b.slots())
+            .sum()
+    }
 }
 
 /// Maps integer 3D coords to `0..values-1`.

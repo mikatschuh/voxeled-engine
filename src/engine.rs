@@ -118,7 +118,7 @@ pub fn engine_thread(
                 mpsc::new::<(ChunkID, Box<[BitMap2D; 6]>)>(config.solid_map_queue_cap);
 
             let threadpool = Threadpool::new(worker_count, |_| task::Context {
-                task_queue: working_class_people.add_worker(100),
+                task_queue: working_class_people.add_worker(config.task_queue_cap),
                 world_generator: world_generator.clone(),
 
                 chunk_tx: chunk_tx.clone(),
@@ -146,7 +146,6 @@ pub fn engine_thread(
 
             let mut time_window = Instant::now();
             let mut tick_count = 0_usize;
-            let mut num_of_queue_pops = 0_usize;
             'tick_loop: loop {
                 // update configs
                 while let Ok(update) = updates_recv.pop() {
@@ -158,7 +157,7 @@ pub fn engine_thread(
                 }
 
                 // submit chunk generation tasks
-                let player_pos = (player.read().pos() / 32.).round();
+                let player_pos = { player.read().pos() / 32. }.round();
                 if Some(player_pos) != players_last_pos {
                     players_last_pos = Some(player_pos);
 
@@ -191,13 +190,9 @@ pub fn engine_thread(
                     );
                 }
 
-                dbg!();
-
                 // process thread pool output
                 while let Ok(submission) = chunk_submission_queue.pop() {
-                    chunks.insert(submission.0, submission.1);
-
-                    num_of_queue_pops += 1;
+                    // chunks.insert(submission.0, submission.1);
                 }
 
                 while let Ok((chunk, solid_map)) = solid_map_queue.pop() {
@@ -207,31 +202,24 @@ pub fn engine_thread(
                     solid_maps[3].insert(chunk, solid_map[3]);
                     solid_maps[4].insert(chunk, solid_map[4]);
                     solid_maps[5].insert(chunk, solid_map[5]);
-
-                    num_of_queue_pops += 1;
                 }
 
                 {
                     let mut collider = collider.write();
                     while let Ok((chunk, submission)) = collider_submission_queue.pop() {
-                        collider.insert(chunk, *submission);
-
-                        num_of_queue_pops += 1;
+                        // collider.insert(chunk, *submission);
                     }
                 }
-
-                dbg!();
+                //
                 // tick measurement
                 tick_count += 1;
                 let time_elapsed = time_window.elapsed().as_secs_f64();
-                if time_elapsed >= 0.1 {
-                    dbg!();
+                if time_elapsed >= 1. {
                     if config.print_tps {
-                        dbg!();
                         print_info!(
-                            "{}t/s\t\tqueue-pops = {}",
+                            "tps: {}\tqueued-tasks: {}",
                             tick_count as f64 / time_elapsed,
-                            num_of_queue_pops
+                            working_class_people.len()
                         );
                     }
                     tick_count = 0;
