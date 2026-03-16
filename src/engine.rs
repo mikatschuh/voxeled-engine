@@ -11,10 +11,11 @@ use rtrb::RingBuffer;
 use tokio::io;
 
 use crate::{
-    Chunk, ComposableGenerator, Mesh,
+    Chunk, ComposableGenerator, MeshReceiver,
     cam_controller::CamController,
     engine_config::{Config, ConfigUpdate},
     flood_fill::{SphereGeneratorAllocations, chunk_neighbors},
+    mesh::MeshUpload,
     meshing::{BitMap2D, BitMap3D},
     mpsc,
     task::{self, Task},
@@ -84,7 +85,7 @@ pub struct RenderThreadChannels {
     pub updates: rtrb::Producer<Update>,
     pub player: Arc<RwLock<CamController>>,
     pub voxel_collider: Arc<RwLock<HashMap<ChunkID, BitMap3D>>>,
-    pub mesh_updates: mpsc::Receiver<(ChunkID, Mesh)>,
+    pub mesh_updates: MeshReceiver,
 }
 
 pub fn engine_thread(
@@ -101,7 +102,8 @@ pub fn engine_thread(
     let collider = Arc::new(RwLock::new(HashMap::<ChunkID, BitMap3D>::new()));
     let collider_render = collider.clone();
 
-    let (mesh_updates_tx, mesh_updates_rx) = mpsc::new::<(ChunkID, Mesh)>(config.mesh_queue_cap);
+    let (mesh_updates_tx, mesh_updates_rx) =
+        mpsc::new::<(ChunkID, MeshUpload)>(config.mesh_queue_cap);
 
     thread::Builder::new()
         .name("engine thread".to_owned())

@@ -4,10 +4,11 @@ use glam::UVec3;
 use parking_lot::RwLock;
 
 use crate::{
-    Chunk, ChunkID, ComposableGenerator, Generator, Mesh,
+    Chunk, ChunkID, ComposableGenerator, Generator,
     cam_controller::CamController,
     chunk::{DenseChunk, idx_to_coord},
     flood_fill::lod_at_dst,
+    mesh::MeshUpload,
     meshing::{
         BitMap2D, BitMap3D, generate_mesh, get_axis_aligned_solid_maps, get_edges, map_visible,
     },
@@ -29,7 +30,7 @@ pub struct Context {
     pub collider_tx: mpsc::Sender<(ChunkID, Box<BitMap3D>)>,
     pub solid_map_tx: mpsc::Sender<(ChunkID, Box<[BitMap2D; 6]>)>,
 
-    pub meshes: mpsc::Sender<(ChunkID, Mesh)>,
+    pub meshes: mpsc::Sender<(ChunkID, MeshUpload)>,
 }
 
 impl RecvTask<Task> for Context {
@@ -85,7 +86,7 @@ impl Context {
         let mesh = generate_mesh(&data, map_visible(&solid_maps, &neighbors));
 
         self.meshes
-            .push((chunk, mesh))
+            .push((chunk, mesh.bytes()))
             .expect("the mesh submission queue is full (shouldn't)");
 
         self.solid_map_tx

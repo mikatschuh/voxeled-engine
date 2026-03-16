@@ -39,14 +39,14 @@ pub fn block_coord(n: f32) -> i32 {
     n.floor() as i32
 }
 
-pub type MeshReceiver = MpscReceiver<(ChunkID, Mesh)>;
+pub type MeshReceiver = MpscReceiver<(ChunkID, MeshUpload)>;
 
 pub use chunk::{Chunk, VoxelType};
 pub use engine::{ChunkID, LodLevel, RenderThreadChannels, Update, engine_thread};
 pub use engine_config::{Config, ConfigUpdate};
 pub use flood_fill::SphereGeneratorAllocations;
 pub use frustum::{Frustum, FrustumAllocations};
-pub use mesh::{Instance, Mesh, TextureID};
+pub use mesh::{Instance, MeshUpload, TextureID};
 pub use mpsc::{Receiver as MpscReceiver, Sender as MpscSender, new as mpsc_channel};
 pub use random::Noise;
 pub use time::{DeltaTime, DeltaTimeMeter};
