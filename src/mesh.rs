@@ -3,7 +3,13 @@ use glam::UVec3;
 #[derive(Debug, Clone)]
 pub struct MeshUpload {
     pub offsets: [u64; 6],
-    pub buf: Box<[u8]>,
+    pub buf: Box<[Instance]>,
+}
+
+impl MeshUpload {
+    pub fn bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.buf)
+    }
 }
 
 pub type TextureID = u16;
@@ -84,7 +90,7 @@ impl Mesh {
 
         let offsets = [0, px_offset, ny_offset, py_offset, nz_offset, pz_offset];
 
-        let mut unified_buffer = Vec::with_capacity(pz_offset as usize + self.pz.len());
+        let mut unified_buffer = Vec::with_capacity((pz_offset >> 2) as usize + self.pz.len());
         unified_buffer.append(&mut self.nx);
         unified_buffer.append(&mut self.px);
         unified_buffer.append(&mut self.ny);
@@ -95,7 +101,7 @@ impl Mesh {
         let slice = unified_buffer.into_boxed_slice();
         MeshUpload {
             offsets,
-            buf: bytemuck::cast_slice_box(slice),
+            buf: slice,
         }
     }
 
