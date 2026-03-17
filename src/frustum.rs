@@ -13,7 +13,7 @@ use crate::{
 /// Chunks are 32^3
 #[derive(Debug, Clone)]
 pub struct Frustum {
-    pub cam_pos: Vec3,
+    pub cam_pos: Vec3, // in chunks
     pub direction: Vec3,
 
     pub fov: f32,
@@ -55,8 +55,6 @@ impl Frustum {
             return &[];
         }
 
-        let cam_pos = self.cam_pos / 32.0;
-
         let forward = if self.direction.length_squared() > 0.0 {
             self.direction.normalize()
         } else {
@@ -76,7 +74,7 @@ impl Frustum {
         let in_frustum = |c: ChunkID| -> bool {
             let size = (1 << c.lod) as f32;
             let center = c.total_pos().as_vec3() + Vec3::splat(size * 0.5);
-            let delta = center - cam_pos;
+            let delta = center - self.cam_pos;
             let half_extent = size * 0.5;
 
             let outside_plane = |normal: Vec3, offset: f32| {
@@ -106,7 +104,7 @@ impl Frustum {
         buffers.next_lod_candidates.clear();
         buffers.chunks.clear();
 
-        let base_chunk = ChunkID::from_pos(cam_pos, 0);
+        let base_chunk = ChunkID::from_pos(self.cam_pos, 0);
         buffers.candidates.push_back(base_chunk);
         buffers.already_queued.insert(base_chunk);
 
@@ -121,7 +119,7 @@ impl Frustum {
                     if buffers.already_queued.insert(neighbor) {
                         let lod = lod_at_dst(
                             self.full_detail_range,
-                            cam_pos,
+                            self.cam_pos,
                             (neighbor.total_pos() & !1).as_vec3(),
                         );
                         let parent = neighbor.parent();
