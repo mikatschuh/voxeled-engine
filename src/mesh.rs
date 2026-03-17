@@ -3,12 +3,16 @@ use glam::UVec3;
 #[derive(Debug, Clone)]
 pub struct MeshUpload {
     pub offsets: [u64; 6],
-    pub buf: Box<[Instance]>,
+    buf: Box<[Instance]>,
 }
 
 impl MeshUpload {
-    pub fn bytes(&self) -> &[u8] {
+    pub fn view(&self) -> &[u8] {
         bytemuck::cast_slice(&self.buf)
+    }
+
+    pub fn len(&self) -> u64 {
+        (self.buf.len() << 2) as u64
     }
 }
 
