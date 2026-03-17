@@ -54,14 +54,13 @@ impl ChunkID {
         }
     }
 
-    pub fn bytes(&self) -> Box<[u8]> {
-        let bytes = [
+    pub fn bytes(&self) -> [u32; 4] {
+        bytemuck::cast([
             self.pos.x.cast_unsigned(),
             self.pos.y.cast_unsigned(),
             self.pos.z.cast_unsigned(),
             self.lod as u32,
-        ];
-        bytemuck::cast_slice(&bytes).into()
+        ])
     }
 }
 
