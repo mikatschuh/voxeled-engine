@@ -6,9 +6,8 @@ use parking_lot::RwLock;
 use crate::{
     Chunk, ChunkID, ComposableGenerator, Generator,
     cam_controller::CamController,
-    chunk::{DenseChunk, idx_to_coord},
+    chunk::{DenseChunk, idx_to_coord, lod_at_dst},
     config::WorkerConfig,
-    flood_fill::lod_at_dst,
     mesh::MeshUpload,
     meshing::{
         BitMap2D, BitMap3D, generate_mesh, get_axis_aligned_solid_maps, get_edges, map_visible,
@@ -80,7 +79,7 @@ impl Context {
         let actual_lod = lod_at_dst(
             self.config.full_detail_distance,
             self.player_pos.read().pos() / 32.,
-            chunk.total_pos().as_vec3(),
+            chunk.center(),
         );
         if chunk.lod >= actual_lod + self.config.task_cancelation_lod_threshold
             || chunk.lod + self.config.task_cancelation_lod_threshold <= actual_lod

@@ -13,7 +13,7 @@ use crate::{
     Chunk, ComposableGenerator, MeshReceiver,
     cam_controller::CamController,
     chunk::ChunkID,
-    config::{ConfigUpdate, EngineConfig, WorkerConfig},
+    config::{ConfigUpdate, EngineConfig},
     flood_fill::{SphereGeneratorAllocations, chunk_neighbors},
     mesh::MeshUpload,
     meshing::{BitMap2D, BitMap3D},

@@ -53,6 +53,11 @@ impl ChunkID {
     }
 }
 
+pub fn lod_at_dst(full_detail_range: f32, cam_chunk_pos: Vec3, chunk_coord: Vec3) -> Lod {
+    let dst = cam_chunk_pos.distance(chunk_coord);
+    (dst / full_detail_range).ceil().log2().ceil().min(65535.) as u16
+}
+
 pub const CHUNK_SIZE: usize = 32;
 pub const CHUNK_VOLUME: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 

@@ -5,10 +5,7 @@ use std::{
     collections::{HashMap, HashSet, VecDeque},
 };
 
-use crate::{
-    ChunkID,
-    flood_fill::{chunk_neighbors, lod_at_dst},
-};
+use crate::{ChunkID, chunk::lod_at_dst, flood_fill::chunk_neighbors};
 
 /// Chunks are 32^3
 #[derive(Debug, Clone)]
@@ -117,12 +114,8 @@ impl Frustum {
 
                 for neighbor in chunk_neighbors(chunk) {
                     if buffers.already_queued.insert(neighbor) {
-                        let lod = lod_at_dst(
-                            self.full_detail_range,
-                            self.cam_pos,
-                            (neighbor.total_pos() & !1).as_vec3(),
-                        );
                         let parent = neighbor.parent();
+                        let lod = lod_at_dst(self.full_detail_range, self.cam_pos, parent.center());
                         if lod == chunk.lod {
                             buffers.candidates.push_back(neighbor);
                         } else if lod > chunk.lod && buffers.already_queued.insert(parent) {

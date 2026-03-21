@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 
 use glam::{IVec3, Vec3};
 
-use crate::{ChunkID, chunk::Lod};
+use crate::{ChunkID, chunk::lod_at_dst};
 
 pub struct SphereGeneratorAllocations {
     pub touched: HashSet<ChunkID>,
@@ -52,12 +52,8 @@ impl SphereGeneratorAllocations {
 
                 for neighbor in chunk_neighbors(chunk) {
                     if self.touched.insert(neighbor) {
-                        let lod = lod_at_dst(
-                            lowest_lod_dst,
-                            center,
-                            (neighbor.total_pos() & !1).as_vec3(),
-                        );
                         let parent = neighbor.parent();
+                        let lod = lod_at_dst(lowest_lod_dst, center, parent.center());
                         if lod == chunk.lod {
                             self.candidates.push_back(neighbor);
                         } else if lod > chunk.lod && self.touched.insert(parent) {
@@ -85,9 +81,4 @@ pub fn chunk_neighbors(c: ChunkID) -> [ChunkID; 6] {
         pos + IVec3::Z,
     ]
     .map(|p| ChunkID::new(c.lod, p))
-}
-
-pub fn lod_at_dst(full_detail_range: f32, cam_chunk_pos: Vec3, chunk_coord: Vec3) -> Lod {
-    let dst = cam_chunk_pos.distance(chunk_coord);
-    (dst / full_detail_range).ceil().log2().ceil().min(65535.) as u16
 }
