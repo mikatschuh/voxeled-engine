@@ -6,7 +6,7 @@ use std::{
 };
 
 pub trait Runable {
-    fn run_task(&mut self) -> bool; // returns true if it was able to do something
+    fn execute_tasks(&mut self) -> bool; // returns true if it was able to do something
 }
 
 pub type WorkerID = usize;
@@ -32,7 +32,7 @@ impl<C: Runable + Send + 'static> Threadpool<C> {
                 .spawn(move || {
                     let mut time_since_task = Instant::now();
                     loop {
-                        while context.run_task() {
+                        if context.execute_tasks() {
                             time_since_task = Instant::now();
                         }
 

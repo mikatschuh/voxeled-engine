@@ -7,24 +7,28 @@ use crate::{
     Chunk, ChunkID, ComposableGenerator, Generator,
     cam_controller::CamController,
     chunk::{DenseChunk, idx_to_coord},
+    config::WorkerConfig,
     flood_fill::lod_at_dst,
     mesh::MeshUpload,
     meshing::{
         BitMap2D, BitMap3D, generate_mesh, get_axis_aligned_solid_maps, get_edges, map_visible,
     },
-    mpsc, voxel,
+    mpsc, spsc, voxel,
     worker_pool::Runable,
 };
 
 #[derive(Debug)]
 pub struct Context {
-    pub task_queues: Vec<rtrb::Consumer<Task>>,
+    pub config: WorkerConfig,
+    pub config_queue: spsc::Consumer<WorkerConfig>,
+
+    pub task_queues: Vec<spsc::Consumer<Task>>,
     pub player_pos: Arc<RwLock<CamController>>,
-    pub full_detail_distance: f32,
 
     pub world_generator: ComposableGenerator,
 
-    pub discarded_tasks: mpsc::Sender<ChunkID>,
+    /// A system to cancel irrelavent tasks.
+    pub canceled_tasks: mpsc::Sender<ChunkID>,
 
     pub chunk_tx: mpsc::Sender<(ChunkID, Chunk)>,
     pub collider_tx: mpsc::Sender<(ChunkID, Box<BitMap3D>)>,
@@ -42,38 +46,56 @@ pub enum Task {
 }
 
 impl Runable for Context {
-    fn run_task(&mut self) -> bool {
-        let mut task_queues = self.task_queues.iter_mut();
+    fn execute_tasks(&mut self) -> bool {
+        for i in 0.. {
+            if let Some(config_update) =
+                (0..).map(|_| self.config_queue.pop().ok()).last().flatten()
+            {
+                self.config = config_update
+            }
 
-        let task = loop {
-            let Some(task_queue) = task_queues.next() else {
-                return false;
+            let mut task_queues = self.task_queues.iter_mut();
+
+            let task = loop {
+                let Some(task_queue) = task_queues.next() else {
+                    return if i == 0 { false } else { true };
+                };
+
+                if let Ok(task) = task_queue.pop() {
+                    break task;
+                }
             };
 
-            if let Ok(task) = task_queue.pop() {
-                break task;
+            use Task::*;
+            match task {
+                GenerateChunkAndMesh { chunk, neighbors } => self.generate_chunk(chunk, neighbors),
             }
-        };
-
-        use Task::*;
-        match task {
-            GenerateChunkAndMesh { chunk, neighbors } => self.generate_chunk(chunk, neighbors),
         }
-        true
+        unreachable!()
     }
 }
 
 impl Context {
-    pub fn generate_chunk(&mut self, chunk: ChunkID, neighbors: Box<[BitMap2D; 6]>) {
-        if lod_at_dst(
-            self.full_detail_distance,
+    fn gets_canceled(&self, chunk: ChunkID) -> bool {
+        let actual_lod = lod_at_dst(
+            self.config.full_detail_distance,
             self.player_pos.read().pos() / 32.,
             chunk.total_pos().as_vec3(),
-        ) > chunk.lod + 1
+        );
+        if chunk.lod >= actual_lod + self.config.task_cancelation_lod_threshold
+            || chunk.lod + self.config.task_cancelation_lod_threshold <= actual_lod
         {
-            self.discarded_tasks
+            self.canceled_tasks
                 .push(chunk)
                 .expect("the discarded task submission queue is full (shouldn't)");
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn generate_chunk(&mut self, chunk: ChunkID, neighbors: Box<[BitMap2D; 6]>) {
+        if self.gets_canceled(chunk) {
             return;
         }
 

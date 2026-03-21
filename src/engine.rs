@@ -5,7 +5,6 @@ use std::{
     time::Instant,
 };
 
-use glam::{IVec3, Vec3};
 use parking_lot::RwLock;
 use rtrb::RingBuffer;
 use tokio::io;
@@ -13,65 +12,16 @@ use tokio::io;
 use crate::{
     Chunk, ComposableGenerator, MeshReceiver,
     cam_controller::CamController,
-    engine_config::{Config, ConfigUpdate},
+    chunk::ChunkID,
+    config::{ConfigUpdate, EngineConfig, WorkerConfig},
     flood_fill::{SphereGeneratorAllocations, chunk_neighbors},
     mesh::MeshUpload,
     meshing::{BitMap2D, BitMap3D},
     mpsc,
-    task_submission::TaskSubmitter,
     worker::{self, Task},
     worker_pool::Threadpool,
+    worker_spsc::WorkerSPMC,
 };
-
-pub type LodLevel = u16;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct ChunkID {
-    pub pos: IVec3,
-    pub lod: LodLevel,
-}
-
-impl ChunkID {
-    pub fn new(lod: LodLevel, pos: IVec3) -> Self {
-        Self { lod, pos }
-    }
-
-    pub fn total_pos(self) -> IVec3 {
-        self.pos << self.lod
-    }
-
-    pub fn parent(self) -> Self {
-        Self {
-            lod: self.lod + 1,
-            pos: self.pos >> 1,
-        }
-    }
-
-    pub fn from_pos(v: Vec3, lod: LodLevel) -> Self {
-        Self {
-            lod,
-            pos: v.floor().as_ivec3(),
-        }
-    }
-
-    pub fn bytes(&self) -> [u32; 4] {
-        bytemuck::cast([
-            self.pos.x.cast_unsigned(),
-            self.pos.y.cast_unsigned(),
-            self.pos.z.cast_unsigned(),
-            self.lod as u32,
-        ])
-    }
-}
-
-impl From<Vec3> for ChunkID {
-    fn from(value: Vec3) -> Self {
-        Self {
-            lod: 0,
-            pos: value.floor().as_ivec3(),
-        }
-    }
-}
 
 const MAX_LOD: usize = 16;
 
@@ -88,7 +38,7 @@ pub struct RenderThreadChannels {
 }
 
 pub fn engine_thread(
-    mut config: Config,
+    mut config: EngineConfig,
     player: CamController,
     world_generator: ComposableGenerator,
 ) -> Result<RenderThreadChannels, io::Error> {
@@ -109,7 +59,7 @@ pub fn engine_thread(
         .spawn(move || -> Result<(), io::Error> {
             let worker_count = (num_cpus::get() - 2).min(config.worker_count).max(1); // minus main + engine thread
 
-            let mut working_class_people = TaskSubmitter::new();
+            let mut working_class = WorkerSPMC::new();
 
             let (chunk_tx, chunk_submission_queue) =
                 mpsc::new::<(ChunkID, Chunk)>(config.chunk_queue_cap);
@@ -124,13 +74,15 @@ pub fn engine_thread(
                 mpsc::new::<(ChunkID, Box<[BitMap2D; 6]>)>(config.solid_map_queue_cap);
 
             let threadpool = Threadpool::new(worker_count, |_| worker::Context {
-                task_queues: working_class_people.add_worker(config.task_queue_cap, MAX_LOD),
+                config: config.worker_config(),
+                config_queue: working_class.add_config_queue(config.engine_worker_config_queue_cap),
+
+                task_queues: working_class.add_task_queues(config.task_queue_cap, MAX_LOD),
                 player_pos: player.clone(),
-                full_detail_distance: config.full_detail_distance,
 
                 world_generator: world_generator.clone(),
 
-                discarded_tasks: discarded_tasks_tx.clone(),
+                canceled_tasks: discarded_tasks_tx.clone(),
 
                 chunk_tx: chunk_tx.clone(),
                 collider_tx: collider_tx.clone(),
@@ -162,7 +114,10 @@ pub fn engine_thread(
                 while let Ok(update) = updates_recv.pop() {
                     use Update::*;
                     match update {
-                        ConfigUpdate { update } => config.update(update),
+                        ConfigUpdate { update } => {
+                            working_class.submit_config_update(update.worker_config());
+                            config.update(update);
+                        }
                         ShutDown => break 'tick_loop,
                     }
                 }
@@ -180,7 +135,7 @@ pub fn engine_thread(
                         |chunk| {
                             if submitted_chunks.insert(chunk) {
                                 let mut axis = 0;
-                                working_class_people.submit_task(
+                                working_class.submit_task(
                                     chunk,
                                     Task::GenerateChunkAndMesh {
                                         chunk,
@@ -234,7 +189,7 @@ pub fn engine_thread(
                         print_info!(
                             "tps  {}\tqueued-tasks  {}",
                             (tick_count as f64 / time_elapsed).round() as usize,
-                            working_class_people.len()
+                            working_class.len()
                         );
                     }
                     tick_count = 0;

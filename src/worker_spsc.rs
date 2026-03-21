@@ -1,20 +1,42 @@
 use rtrb::PushError;
 
-use crate::{ChunkID, worker::Task, worker_pool::WorkerID};
+use crate::{ChunkID, config::WorkerConfig, spsc, worker::Task, worker_pool::WorkerID};
 
-pub struct TaskSubmitter {
-    queues: Vec<Vec<rtrb::Producer<Task>>>,
+pub struct WorkerSPMC {
+    queues: Vec<Vec<spsc::Producer<Task>>>,
+    config_queues: Vec<spsc::Producer<WorkerConfig>>,
 }
 
-impl TaskSubmitter {
+impl WorkerSPMC {
     pub fn new() -> Self {
-        Self { queues: vec![] }
+        Self {
+            queues: vec![],
+            config_queues: vec![],
+        }
     }
 
-    pub fn add_worker(&mut self, cap: usize, max_lod: usize) -> Vec<rtrb::Consumer<Task>> {
+    pub fn add_task_queues(&mut self, cap: usize, max_lod: usize) -> Vec<spsc::Consumer<Task>> {
         let (txs, rxs) = (0..max_lod).map(|_| rtrb::RingBuffer::new(cap)).unzip();
         self.queues.push(txs);
         rxs
+    }
+
+    pub fn add_config_queue(&mut self, cap: usize) -> spsc::Consumer<WorkerConfig> {
+        let (tx, rx) = rtrb::RingBuffer::new(cap);
+        self.config_queues.push(tx);
+        rx
+    }
+
+    pub fn submit_config_update(&mut self, mut config: WorkerConfig) {
+        for config_queue in &mut self.config_queues {
+            loop {
+                match config_queue.push(config) {
+                    Ok(()) => return,
+                    Err(PushError::Full(v)) => config = v,
+                }
+                std::hint::spin_loop();
+            }
+        }
     }
 
     pub fn submit_task(&mut self, chunk: ChunkID, mut task: Task) {
@@ -24,7 +46,7 @@ impl TaskSubmitter {
         loop {
             match queue.push(task) {
                 Ok(()) => return,
-                Err(PushError::Full(t)) => task = t,
+                Err(PushError::Full(v)) => task = v,
             }
             std::hint::spin_loop();
         }

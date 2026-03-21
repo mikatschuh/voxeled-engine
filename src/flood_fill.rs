@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 
 use glam::{IVec3, Vec3};
 
-use crate::{ChunkID, engine::LodLevel};
+use crate::{ChunkID, chunk::Lod};
 
 pub struct SphereGeneratorAllocations {
     pub touched: HashSet<ChunkID>,
@@ -87,7 +87,7 @@ pub fn chunk_neighbors(c: ChunkID) -> [ChunkID; 6] {
     .map(|p| ChunkID::new(c.lod, p))
 }
 
-pub fn lod_at_dst(full_detail_range: f32, cam_chunk_pos: Vec3, chunk_coord: Vec3) -> LodLevel {
+pub fn lod_at_dst(full_detail_range: f32, cam_chunk_pos: Vec3, chunk_coord: Vec3) -> Lod {
     let dst = cam_chunk_pos.distance(chunk_coord);
     (dst / full_detail_range).ceil().log2().ceil().min(65535.) as u16
 }

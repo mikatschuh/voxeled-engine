@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    engine::ChunkID,
+    ChunkID,
     flood_fill::{chunk_neighbors, lod_at_dst},
 };
 
