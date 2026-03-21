@@ -47,9 +47,7 @@ pub enum Task {
 impl Runable for Context {
     fn execute_tasks(&mut self) -> bool {
         for i in 0.. {
-            if let Some(config_update) =
-                (0..).map(|_| self.config_queue.pop().ok()).last().flatten()
-            {
+            if let Some(config_update) = (0..).map_while(|_| self.config_queue.pop().ok()).last() {
                 self.config = config_update
             }
 
@@ -86,7 +84,7 @@ impl Context {
         {
             self.canceled_tasks
                 .push(chunk)
-                .expect("the discarded task submission queue is full (shouldn't)");
+                .expect("the canceled task submission queue is full (shouldn't)");
             true
         } else {
             false
