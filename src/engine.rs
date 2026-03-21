@@ -18,9 +18,9 @@ use crate::{
     mesh::MeshUpload,
     meshing::{BitMap2D, BitMap3D},
     mpsc,
-    task::{self, Task},
     task_submission::TaskSubmitter,
-    worker::Threadpool,
+    worker::{self, Task},
+    worker_pool::Threadpool,
 };
 
 pub type LodLevel = u16;
@@ -123,7 +123,7 @@ pub fn engine_thread(
             let (solid_maps_tx, solid_map_queue) =
                 mpsc::new::<(ChunkID, Box<[BitMap2D; 6]>)>(config.solid_map_queue_cap);
 
-            let threadpool = Threadpool::new(worker_count, |_| task::Context {
+            let threadpool = Threadpool::new(worker_count, |_| worker::Context {
                 task_queues: working_class_people.add_worker(config.task_queue_cap, MAX_LOD),
                 player_pos: player.clone(),
                 full_detail_distance: config.full_detail_distance,

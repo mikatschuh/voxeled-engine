@@ -22,9 +22,9 @@ mod flood_fill;
 mod mesh;
 mod meshing;
 mod random;
-mod task;
 mod task_submission;
 mod worker;
+mod worker_pool;
 mod world_gen;
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use rtrb::PushError;
 
-use crate::{ChunkID, task::Task, worker::WorkerID};
+use crate::{ChunkID, worker::Task, worker_pool::WorkerID};
 
 pub struct TaskSubmitter {
     queues: Vec<Vec<rtrb::Producer<Task>>>,
