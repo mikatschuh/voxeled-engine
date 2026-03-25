@@ -11,24 +11,30 @@ use std::{
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::error::ConfigResult;
+use crate::error::{ConfigError, ConfigResult};
 
 pub trait Live: Clone + Send + Sync + 'static {}
-pub trait ConfigFile<L: Live>:
+pub trait ConfigFile<L: Live, C: Config<L>, E: Into<ConfigError>>:
     DeserializeOwned + Serialize + Clone + Send + Sync + 'static
 {
+    fn check(self) -> Result<C, E>;
+}
+pub trait Config<L> {
     fn live(self) -> L;
     fn sender_cap(&self) -> usize;
 }
 
-pub fn config_thread<C: ConfigFile<L> + Debug, L: Live>(
+pub fn config_thread<CF: ConfigFile<L, C, E> + Debug, C: Config<L>, L: Live, E>(
     path: PathBuf,
-) -> ConfigResult<(C, rtrb::Consumer<L>)> {
+) -> ConfigResult<(C, rtrb::Consumer<L>)>
+where
+    ConfigError: From<E>,
+{
     let mut settings_file = File::open(&path)?;
     let mut toml_settings = String::new();
     settings_file.read_to_string(&mut toml_settings)?;
 
-    let initial_config: C = toml::from_str(&toml_settings)?;
+    let initial_config = toml::from_str::<CF>(&toml_settings)?.check()?;
 
     let (mut main_tx, main_rx) = rtrb::RingBuffer::<L>::new(initial_config.sender_cap());
 
@@ -69,8 +75,9 @@ pub fn config_thread<C: ConfigFile<L> + Debug, L: Live>(
                     continue;
                 };
 
-                match toml::from_str::<C>(string) {
+                match toml::from_str::<CF>(string) {
                     Ok(cfg) => {
+                        let Ok(cfg) = cfg.check() else { continue };
                         _ = main_tx.push(cfg.live());
                     }
                     Err(_) => {}

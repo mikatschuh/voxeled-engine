@@ -18,6 +18,8 @@ pub enum Error {
     NotifyError { err: notify::Error },
     Utf8Error,
 
+    LogicError { msg: String },
+
     UnknownKeys,
 }
 
@@ -40,6 +42,8 @@ impl Display for Error {
                     &string
                 }
                 Utf8Error => "the config file contained an UTF-8 error",
+
+                LogicError { msg } => &msg,
 
                 UnknownKeys => "the settings file did contain unknown keys",
             }

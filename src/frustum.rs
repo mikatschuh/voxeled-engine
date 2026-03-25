@@ -148,7 +148,7 @@ fn select_render_chunks(
             let mut found = false;
 
             let mut iterations = 0_usize;
-            while iterations <= 5 {
+            while iterations <= 2 {
                 next = next.parent();
                 if ready_meshes.contains_key(&next) {
                     candidate = next;

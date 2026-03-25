@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
     thread,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use parking_lot::RwLock;
@@ -110,6 +110,8 @@ pub fn engine_thread(
             let mut time_window = Instant::now();
             let mut tick_count = 0_usize;
             'tick_loop: loop {
+                let tick_start = Instant::now();
+
                 // update configs
                 while let Ok(update) = updates_recv.pop() {
                     use Update::*;
@@ -181,19 +183,24 @@ pub fn engine_thread(
                     submitted_chunks.remove(&chunk);
                 }
 
+                let tick_time = tick_start.elapsed().as_secs_f64();
+                if tick_time < config.target_tps {
+                    thread::sleep(Duration::from_secs_f64(config.target_tps - tick_time));
+                }
+
                 // tick measurement
                 tick_count += 1;
                 let time_elapsed = time_window.elapsed().as_secs_f64();
-                if time_elapsed >= 1. {
-                    if config.print_tps {
+                if let Some(time_per_print) = config.print_tps_per {
+                    if time_elapsed >= time_per_print {
                         print_info!(
                             "tps  {}\tqueued-tasks  {}",
                             (tick_count as f64 / time_elapsed).round() as usize,
                             working_class.len()
                         );
+                        tick_count = 0;
+                        time_window = Instant::now();
                     }
-                    tick_count = 0;
-                    time_window = Instant::now();
                 }
             }
             print_info!("SHUTDOWN");

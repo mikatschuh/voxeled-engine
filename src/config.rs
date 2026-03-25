@@ -11,7 +11,8 @@ pub struct EngineConfig {
     pub total_generation_distance: f32,
     pub max_chunks: usize,
 
-    pub print_tps: bool,
+    pub print_tps_per: Option<f64>,
+    pub target_tps: f64,
 
     pub worker_count: usize,
 
@@ -33,7 +34,8 @@ pub struct ConfigUpdate {
     pub total_generation_distance: f32,
     pub max_chunks: usize,
 
-    pub print_tps: bool,
+    pub print_tps_per: Option<f64>,
+    pub target_tps: f64,
 }
 
 impl ConfigUpdate {
@@ -47,12 +49,22 @@ impl ConfigUpdate {
 
 impl EngineConfig {
     pub fn update(&mut self, update: ConfigUpdate) {
-        self.full_detail_distance = update.full_detail_distance;
-        self.task_cancelation_lod_threshold = update.task_cancelation_lod_threshold;
+        let ConfigUpdate {
+            full_detail_distance,
+            task_cancelation_lod_threshold,
+            total_generation_distance,
+            max_chunks,
+            print_tps_per,
+            target_tps,
+        } = update;
 
-        self.total_generation_distance = update.total_generation_distance;
-        self.max_chunks = update.max_chunks;
-        self.print_tps = update.print_tps;
+        self.full_detail_distance = full_detail_distance;
+        self.task_cancelation_lod_threshold = task_cancelation_lod_threshold;
+
+        self.total_generation_distance = total_generation_distance;
+        self.max_chunks = max_chunks;
+        self.print_tps_per = print_tps_per;
+        self.target_tps = target_tps;
     }
 
     pub fn worker_config(&self) -> WorkerConfig {

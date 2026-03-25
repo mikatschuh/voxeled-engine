@@ -2,6 +2,7 @@ use glam::{IVec3, Vec3};
 
 pub mod cam_controller;
 pub mod config;
+pub mod config_loader;
 pub mod error;
 pub mod frustum;
 pub mod mpsc;
@@ -16,7 +17,6 @@ mod data_structures;
 #[macro_use]
 #[allow(dead_code)]
 mod debug;
-mod config_loader;
 mod engine;
 mod flood_fill;
 mod mesh;
@@ -44,7 +44,6 @@ pub fn block_coord(n: f32) -> i32 {
 pub type MeshReceiver = MpscReceiver<(ChunkID, MeshUpload)>;
 
 pub use chunk::{Chunk, ChunkID, Lod, VoxelType};
-pub use config_loader::{ConfigFile, Live, config_thread};
 pub use engine::{RenderThreadChannels, Update, engine_thread};
 pub use flood_fill::SphereGeneratorAllocations;
 pub use frustum::{Frustum, FrustumAllocations};
