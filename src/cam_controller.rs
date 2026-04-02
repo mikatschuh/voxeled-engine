@@ -1,3 +1,5 @@
+use std::f32::consts::{FRAC_PI_2, PI};
+
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +9,10 @@ pub fn dir_from_angle(yaw: f32, pitch: f32) -> Vec3 {
     let (sin_pitch, cos_pitch) = pitch.sin_cos();
     let (sin_yaw, cos_yaw) = yaw.sin_cos();
     Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize()
+}
+
+fn wrap_angle(angle: f32) -> f32 {
+    (angle + PI).rem_euclid(2.0 * PI) - PI
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -29,8 +35,10 @@ pub struct CamController {
 
     yaw: f32, // source of truth
     pitch: f32,
+    inverted: bool,
 
     dir: Vec3,
+    up: Vec3,
 
     delta_time: DeltaTime,
     config: CameraConfig,
@@ -45,41 +53,46 @@ impl CamController {
         delta_time: DeltaTime,
         config: CameraConfig,
     ) -> Self {
-        let dir = dir_from_angle(yaw, pitch);
-
-        Self {
+        let mut controller = Self {
             body: TCBody::new(pos),
             pending_acc: Vec3::ZERO,
 
             free_cam,
             speed: config.standart_speed,
 
-            dir,
             yaw,
             pitch,
+            inverted: false,
+            dir: Vec3::ZERO,
+            up: Vec3::Y,
 
             delta_time,
             config,
-        }
+        };
+
+        controller.normalize_angles();
+        controller.update_basis();
+        controller
     }
 
     /// Dreht die Kamera um einen Winkel multipliziert mit der Kamera Sensitivität.
     pub fn rotate_around_angle(&mut self, yaw: f32, pitch: f32) {
-        self.yaw += yaw * self.config.sensitivity;
-        self.pitch += pitch * self.config.sensitivity;
+        let control_sign = self.control_sign();
+        self.yaw += yaw * self.config.sensitivity * control_sign;
+        self.pitch += pitch * self.config.sensitivity * control_sign;
 
-        self.dir = dir_from_angle(self.yaw, self.pitch);
-        // self.rot = Quat::from_rotation_y(yaw) * Quat::from_rotation_z(pitch);
+        self.normalize_angles();
+        self.update_basis();
     }
 
     /// Bewegt die Kamera in eine Richtung relativ zur Richtung in die die Kamera zeigt.
     pub fn add_input(&mut self, input_vector: Vec3) {
         let (yaw_sin, yaw_cos) = self.yaw.sin_cos();
-        let forward = dir_from_angle(self.yaw, self.pitch);
-        let right = Vec3::new(-yaw_sin, 0.0, yaw_cos).normalize();
+        let forward = self.dir;
+        let right = (Vec3::new(-yaw_sin, 0.0, yaw_cos) * self.control_sign()).normalize();
         let impuls = forward * input_vector.x * self.speed
             + right * input_vector.z * self.speed
-            + Vec3::Y * input_vector.y * self.speed;
+            + self.up * input_vector.y * self.speed;
 
         self.pending_acc = impuls;
     }
@@ -133,5 +146,34 @@ impl CamController {
 
     pub fn dir(&self) -> Vec3 {
         self.dir
+    }
+
+    pub fn up(&self) -> Vec3 {
+        self.up
+    }
+
+    fn update_basis(&mut self) {
+        self.dir = dir_from_angle(self.yaw, self.pitch);
+        self.up = Vec3::Y * self.control_sign();
+    }
+
+    fn normalize_angles(&mut self) {
+        while self.pitch > FRAC_PI_2 {
+            self.pitch = PI - self.pitch;
+            self.yaw += PI;
+            self.inverted = !self.inverted;
+        }
+
+        while self.pitch < -FRAC_PI_2 {
+            self.pitch = -PI - self.pitch;
+            self.yaw += PI;
+            self.inverted = !self.inverted;
+        }
+
+        self.yaw = wrap_angle(self.yaw);
+    }
+
+    fn control_sign(&self) -> f32 {
+        if self.inverted { -1.0 } else { 1.0 }
     }
 }
